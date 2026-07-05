@@ -23,7 +23,28 @@ and which TLS certificates are expiring soon.
 
 <!-- Shipped and confirmed valuable. -->
 
-(None yet — ship to validate)
+- [x] **CORE-04**: The integration exposes each discovered Traefik router as a
+      binary sensor named after its `@router` rule identifier, with state
+      derived from the router's `status` field. _(Validated in Phase 1,
+      re-validated by Phase 2 per-category device migration.)_
+- [x] **CORE-05**: The integration exposes each Traefik entrypoint as a sensor
+      reporting the listening address and current request count. _(Validated
+      in Phase 2 — `TraefikEntrypointSensor`.)_
+- [x] **CORE-06**: The integration exposes each Traefik service as a sensor
+      reporting its load-balancer status and backend server health. _(Validated
+      in Phase 2 — `TraefikServiceSensor`.)_
+- [x] **DIAG-01**: The integration aggregates a top-level `sensor.traefik`
+      reporting the total number of routers, services, and middlewares.
+      _(Validated in Phase 2 — 3 aggregate count sensors on the Overview
+      device.)_
+- [x] **DIAG-02**: The integration creates a `binary_sensor` that becomes `on`
+      when any router is reporting a non-`enabled` status. _(Validated in
+      Phase 2 — `TraefikAnyRouterFailingBinarySensor` on the Diagnostics
+      device.)_
+- [x] **DIAG-03**: The integration supports a "reload" service that calls the
+      Traefik `/api/http/routers/refresh` endpoint, allowing HA automations
+      to trigger a hot reload after route changes. _(Validated in Phase 2 —
+      `traefik.reload_routers` registered at module level.)_
 
 ### Active
 
@@ -37,26 +58,12 @@ and which TLS certificates are expiring soon.
 - [ ] **CORE-03**: The integration connects to the Traefik API over HTTP using
       the `/api/entrypoints`, `/api/http/routers`, `/api/http/services`, and
       `/api/http/middlewares` endpoints.
-- [ ] **CORE-04**: The integration exposes each discovered Traefik router as a
-      binary sensor named after its `@router` rule identifier, with state
-      derived from the router's `status` field.
-- [ ] **CORE-05**: The integration exposes each Traefik entrypoint as a sensor
-      reporting the listening address and current request count.
-- [ ] **CORE-06**: The integration exposes each Traefik service as a sensor
-      reporting its load-balancer status and backend server health.
 - [ ] **TLS-01**: For every router terminating TLS, the integration exposes
       a sensor with the certificate's `notAfter` date and a calculated
       "days until expiry" attribute.
 - [ ] **TLS-02**: The integration creates a dedicated `binary_sensor` per
       certificate that turns `on` when the certificate is within a
       user-configurable expiry threshold (default: 14 days).
-- [ ] **DIAG-01**: The integration aggregates a top-level `sensor.traefik`
-      reporting the total number of routers, services, and middlewares.
-- [ ] **DIAG-02**: The integration creates a `binary_sensor` that becomes `on`
-      when any router is reporting a non-`enabled` status.
-- [ ] **DIAG-03**: The integration supports a "reload" service that calls the
-      Traefik `/api/http/routers/refresh` endpoint, allowing HA automations
-      to trigger a hot reload after route changes.
 - [ ] **CFG-01**: User can override the API base URL, TLS verification, scan
       interval, and certificate warning threshold from integration options.
 - [ ] **DOCS-01**: A `README.md` documents install via HACS and manual,
@@ -147,4 +154,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2025-07-05 after initialization*
+*Last updated: 2026-07-05 after Phase 2 completion — 6 v1 requirements validated (CORE-04/05/06, DIAG-01/02/03), 8 remain in Active.*
