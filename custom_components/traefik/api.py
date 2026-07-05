@@ -152,9 +152,7 @@ class TraefikApiClient:
                 ) as response:
                     _LOGGER.debug("path=%s status=%s", "/api/http/routers/refresh", response.status)
                     if response.status in (401, 403):
-                        raise TraefikAuthError(
-                            f"Auth failed for /api/http/routers/refresh: {response.status}"
-                        )
+                        raise TraefikAuthError(f"Auth failed for /api/http/routers/refresh: {response.status}")
                     response.raise_for_status()
                     return None
         except aiohttp.ClientResponseError as err:

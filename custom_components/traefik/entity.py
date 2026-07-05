@@ -69,11 +69,7 @@ class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
     def device_info(self) -> DeviceInfo:
         url_host = self._url_host()
         model = _category_to_model(self._category)
-        name = (
-            f"{url_host} Traefik \u2014 {model}"
-            if url_host
-            else f"{DEFAULT_NAME} \u2014 {model}"
-        )
+        name = f"{url_host} Traefik \u2014 {model}" if url_host else f"{DEFAULT_NAME} \u2014 {model}"
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._entry.entry_id}_{self._category}")},
             manufacturer="Traefik",
