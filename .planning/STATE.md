@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-07-05T22:47:20.790Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-07-05T23:25:00Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 0
+  total_plans: 8
+  completed_plans: 5
+  percent: 63
 ---
 
 # Project State
@@ -23,46 +23,46 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 **Core value:** If nothing else works, the user must be able to see — at a
 glance inside Home Assistant — which Traefik routers are enabled, which are
 failing, and which TLS certificates are expiring soon.
-**Current focus:** Phase 1 — Foundation (scaffold + Config Flow + Coordinator + first router binary_sensor + HACS manifest)
+**Current focus:** Phase 02 — core-entities-options-reauth-reload
 first router binary_sensor + HACS manifest)
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-05
-mapped, 0 unmapped).
+Phase: 02 (core-entities-options-reauth-reload) — EXECUTING
+Plan: 1 of 4 complete (next: 02-02 Config Flow)
+Status: Ready to execute plan 02-02
+Last activity: 2026-07-05 -- Phase 02 plan 01 complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████░░░░] 63%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: — min
-- Total execution time: 0.0 hours
+- Total plans completed: 5
+- Average duration: 12m
+- Total execution time: 1.0 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Foundation | 0 | TBD | — |
-| 2. Core Entities + Options + Reauth + Reload | 0 | TBD | — |
-| 3. TLS Certificate Expiry | 0 | TBD | — |
-| 4. Quality + Diagnostics + Polish + HACS | 0 | TBD | — |
+| 1. Foundation | 4 | 4 | 12m |
+| 2. Core Entities + Options + Reauth + Reload | 1 | 4 | 17m |
+| 3. TLS Certificate Expiry | 0 | 3 | — |
+| 4. Quality + Diagnostics + Polish + HACS | 0 | 2 | — |
 
 **Recent Trend:**
 
-- Last 5 plans: — (none yet)
-- Trend: —
+- Last 5 plans: 4 from Phase 1 + Phase 02 P01 (17m, 3 tasks, 12 files)
+- Trend: stable
 
 *Updated after each plan completion*
 | Phase 01 P01 | 10 | 2 tasks | 9 files |
 | Phase 01 P02 | 7 | 3 tasks | 4 files |
 | Phase 01 P03 | 9 | 2 tasks | 6 files |
 | Phase 01 P04 | 25 | 2 tasks | 18 files |
+| Phase 02-core-entities-options-reauth-reload P01 | 17m | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -86,6 +86,11 @@ Recent decisions affecting current work:
   but quality-scale Bronze is targeted without it (decide during Phase 2
   discuss).
 
+- [Phase 02-core-entities-options-reauth-reload]: Per-category multi-device model: TraefikEntity takes (entry, category, *, description_key=None); device identifier is (DOMAIN, f'{entry_id}_{category}') instead of Phase 1's single-device (DOMAIN, entry_id). Existing HA device-registry rows become orphans; new per-category devices appear on first restart after upgrade.
+- [Phase 02-core-entities-options-reauth-reload]: TraefikData is now a TypedDict (PEP-589, total=False) with version/entrypoints/http_routers/http_services/http_middlewares/overview keys. fetch_all drops entire payload on non-auth error (CONTEXT.md D-07) so entities see a stale cycle rather than mixed fresh+stale data.
+- [Phase 02-core-entities-options-reauth-reload]: filter_internal_items lifted from binary_sensor to api.py — canonical helper for @<provider> filtering across all Phase 2 platforms (routers/services/middlewares/entrypoints). Local _filter_user_routers / _PROVIDER_SUFFIX_RE removed from binary_sensor.
+- [Phase 02-core-entities-options-reauth-reload]: reload_routers POSTs /api/http/routers/refresh with explicit Content-Length: 0 header (aiohttp requires it for empty-body POSTs). Does not poll — verification lives in the reload service handler (plan 02-04). Traefik returns 202 before reload completes (PITFALLS #15).
+
 ### Pending Todos
 
 None yet.
@@ -103,9 +108,15 @@ None yet.
   DIAG:4 + TLS:5 + UX:4 + DIST:5 + DOCS:4 + TEST:4 = 49). Table itself
   is correct — only the footer is stale. Cosmetic; not a coverage gap.
 
+- Phase 2-03 depends on the per-category device model landed in plan 02-01.
+  The four new sensor platforms (TraefikEntrypointSensor, TraefikServiceSensor,
+  three aggregate counters) all instantiate via
+  `super().__init__(entry, category='http_entrypoints' | 'http_services' |
+  'overview', description_key=...)` — every parameter is now in place.
+
 ## Session Continuity
 
-Last session: 2026-07-05T22:47:20.786Z
-Stopped at: Phase 2 context gathered
-49/49 v1 requirements mapped; commit pending.
-Resume file: .planning/phases/02-core-entities-options-reauth-reload/02-CONTEXT.md
+Last session: 2026-07-05T23:25:00Z
+Stopped at: Completed 02-01-PLAN.md
+49/49 v1 requirements mapped.
+Resume file: .planning/phases/02-core-entities-options-reauth-reload/02-02-PLAN.md

@@ -35,7 +35,7 @@ Requirements for initial release. Each maps to a roadmap phase.
       on a long-lived session.
 - [x] **API-04**: The API client raises `TraefikAuthError` on HTTP 401 and
       `TraefikApiError` on other non-2xx responses — never logs the token.
-- [ ] **API-05**: The API client can trigger `traefik.reload_routers` via
+- [x] **API-05**: The API client can trigger `traefik.reload_routers` via
       `POST /api/http/routers/refresh` and report whether the refresh
       actually completed (Traefik returns 200 before reload finishes).
 - [x] **API-06**: The API client supports HTTP and HTTPS targets, with
@@ -59,10 +59,10 @@ Requirements for initial release. Each maps to a roadmap phase.
 - [x] **ROUTER-01**: A `binary_sensor` exists for each Traefik router,
       with state `on` when the router is `enabled` and `off` when
       `disabled` or errored — `BinarySensorDeviceClass.RUNNING`.
-- [ ] **ROUTER-02**: Each router entity exposes the Traefik router `name`,
+- [x] **ROUTER-02**: Each router entity exposes the Traefik router `name`,
       friendly rule (first `Host(...)` match), and full `rule` as
       extra-state-attributes for dashboards and automations.
-- [ ] **ROUTER-03**: Traefik router names containing `@` are filtered at
+- [x] **ROUTER-03**: Traefik router names containing `@` are filtered at
       coordinator level (HA entity-ID regex rejects `@`).
 - [x] **ROUTER-04**: Every router entity has a stable `unique_id` so
       re-setup does not duplicate entries.
@@ -226,15 +226,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | API-02 | Phase 1 | Complete |
 | API-03 | Phase 1 | Complete |
 | API-04 | Phase 1 | Complete |
-| API-05 | Phase 2 | Pending |
+| API-05 | Phase 2 | Complete |
 | API-06 | Phase 1 | Complete |
 | COORD-01 | Phase 1 | Complete |
 | COORD-02 | Phase 1 | Complete |
 | COORD-03 | Phase 1 | Complete |
 | COORD-04 | Phase 1 | Complete |
 | ROUTER-01 | Phase 1 | Complete |
-| ROUTER-02 | Phase 2 | Pending |
-| ROUTER-03 | Phase 2 | Pending |
+| ROUTER-02 | Phase 2 | Complete |
+| ROUTER-03 | Phase 2 | Complete |
 | ROUTER-04 | Phase 1 | Complete |
 | ENTRY-01 | Phase 2 | Pending |
 | ENTRY-02 | Phase 2 | Pending |
