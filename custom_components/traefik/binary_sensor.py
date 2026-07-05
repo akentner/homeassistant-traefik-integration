@@ -33,15 +33,24 @@ async def async_setup_entry(
     entry: TraefikConfigEntry,
     async_add_entities: Any,
 ) -> None:
-    """Set up Traefik router binary sensors for a config entry."""
+    """Set up Traefik binary sensors for a config entry.
+
+    Creates one ``TraefikRouterBinarySensor`` per user-visible Traefik HTTP
+    router (CONTEXT.md D-06 / Phase 1 ROUTER-01) PLUS one
+    ``TraefikAnyRouterFailingBinarySensor`` aggregate on the Diagnostics
+    device (CONTEXT.md D-14/D-19). The aggregate is a single instance per
+    config entry — never deleted; if all routers disappear the sensor falls
+    to OFF (no routers failing) and stays.
+    """
     coordinator: TraefikCoordinator = entry.runtime_data
 
     # Phase 2: read `http_routers` (was `routers` in Phase 1 — fetch_all now
     # returns the renamed key per CONTEXT.md D-04). filter_internal_items is
     # the canonical helper from api.py (replaces _filter_user_routers).
     routers = filter_internal_items(coordinator.data.get("http_routers") or [])
-    entities = [TraefikRouterBinarySensor(entry, coordinator, router) for router in routers]
-    async_add_entities(entities)
+    router_entities = [TraefikRouterBinarySensor(entry, coordinator, router) for router in routers]
+    any_failing_entity = TraefikAnyRouterFailingBinarySensor(entry, coordinator)
+    async_add_entities([*router_entities, any_failing_entity])
 
 
 class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
@@ -84,6 +93,73 @@ class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
             # mangles special characters.
             "name": self._router.get("name"),
             "router_name": self._router.get("name"),
+        }
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+
+class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
+    """Aggregates router health: ON when ANY router status != 'enabled'.
+
+    Single instance per config entry — never deleted (CONTEXT.md D-19).
+    Lives on the Diagnostics device alongside the reload button
+    (CONTEXT.md D-14). ``entity_registry_enabled_default=False`` per
+    PITFALLS M-12 so the diagnostic entity does not pollute the States
+    panel by default — users opt in consciously when they want the
+    "any router failing" alarm surfaced.
+
+    Per CONTEXT.md D-14 the device class is ``PROBLEM`` so the UI shows the
+    standard problem icon and groups the entity with HA's other health
+    alarms. ``is_on`` is ``True`` when at least one router is anything other
+    than ``enabled`` (``disabled``, ``warning``, ``error`` — matches the
+    semantics used by ``TraefikRouterBinarySensor.is_on``).
+
+    Reads the raw ``http_routers`` list (NOT ``filter_internal_items``-ed)
+    so a failing Traefik-internal router like ``api@internal`` can also
+    surface the alarm — internal routers are filtered from per-router
+    entities (entity-id regex rejects ``@``) but the aggregate is
+    internally a normal HA entity and can hold any name.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        entry: TraefikConfigEntry,
+        coordinator: TraefikCoordinator,
+    ) -> None:
+        super().__init__(entry, category="diagnostics", description_key="any_router_failing")
+        self._attr_unique_id = f"{entry.entry_id}_diagnostics_any_router_failing"
+        self.entity_id = "binary_sensor.traefik_any_router_failing"
+        self._attr_name = "Any router failing"
+
+    @property
+    def is_on(self) -> bool | None:
+        data = self.coordinator.data
+        if not isinstance(data, dict):
+            return None
+        routers = data.get("http_routers")
+        if not isinstance(routers, list):
+            # Transient gap in coordinator data — return None so HA shows
+            # the entity as "unknown" rather than flipping to OFF and
+            # potentially masking a real failure.
+            return None
+        failing = [r for r in routers if isinstance(r, dict) and r.get("status") != "enabled"]
+        return bool(failing)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self.coordinator.data
+        routers = data.get("http_routers") if isinstance(data, dict) else None
+        if not isinstance(routers, list):
+            return {"failing_router_count": 0, "failing_router_names": []}
+        failing = [r for r in routers if isinstance(r, dict) and r.get("status") != "enabled"]
+        return {
+            "failing_router_count": len(failing),
+            "failing_router_names": [r.get("name") for r in failing if isinstance(r, dict)],
         }
 
     @property
