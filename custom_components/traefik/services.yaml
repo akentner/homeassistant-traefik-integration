@@ -1,3 +1,7 @@
-# Phase 2 will register the traefik.reload_routers service here.
-# Keeping services.yaml present so HA validates the integration
-# even before any service is added.
+reload_routers:
+  name: Reload routers
+  description: >-
+    Trigger a Traefik dynamic-config reload and verify completion by polling
+    /api/http/routers. Returns {verified, elapsed_ms, attempts, name_diff}
+    \u2014 verified=false means the refresh was accepted but the polling
+    timeout elapsed without a router-set change.
