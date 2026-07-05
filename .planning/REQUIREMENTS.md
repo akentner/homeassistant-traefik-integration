@@ -69,18 +69,18 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Entities — Entrypoints, Services, Overview (CORE-05, CORE-06, DIAG-01)
 
-- [ ] **ENTRY-01**: A `sensor` per Traefik entrypoint reports the
+- [x] **ENTRY-01**: A `sensor` per Traefik entrypoint reports the
       listening address and current request count.
-- [ ] **ENTRY-02**: A `sensor` per Traefik service reports load-balancer
+- [x] **ENTRY-02**: A `sensor` per Traefik service reports load-balancer
       status and backend server health (when healthcheck is configured).
-- [ ] **ENTRY-03**: An aggregate `sensor.traefik` reports the total
+- [x] **ENTRY-03**: An aggregate `sensor.traefik` reports the total
       number of routers, services, and middlewares.
 
 ### Entities — Diagnostics & Reload (DIAG-02, DIAG-03)
 
-- [ ] **DIAG-01**: A top-level `binary_sensor` becomes `on` when any
+- [x] **DIAG-01**: A top-level `binary_sensor` becomes `on` when any
       router is reporting a non-`enabled` status — `BinarySensorDeviceClass.PROBLEM`.
-- [ ] **DIAG-02**: A `button` entity triggers the `Reload` button device
+- [x] **DIAG-02**: A `button` entity triggers the `Reload` button device
       class and posts a refresh to Traefik when pressed.
 - [ ] **DIAG-03**: A `traefik.reload_routers` service is registered
       during `async_setup` (not `async_setup_entry`) and verifies reload
@@ -110,7 +110,7 @@ Requirements for initial release. Each maps to a roadmap phase.
       convention so the UI displays `<Device> <Entity Name>`.
 - [ ] **UX-03**: Stale entities (e.g. a router removed in Traefik) are
       pruned via `coordinator.async_add_listener` cleanup hook.
-- [ ] **UX-04**: All entities expose additional state attributes
+- [x] **UX-04**: All entities expose additional state attributes
       (Traefik IDs, rule excerpts, raw timestamps) so dashboards and
       automations can drill in.
 
@@ -236,11 +236,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROUTER-02 | Phase 2 | Complete |
 | ROUTER-03 | Phase 2 | Complete |
 | ROUTER-04 | Phase 1 | Complete |
-| ENTRY-01 | Phase 2 | Pending |
-| ENTRY-02 | Phase 2 | Pending |
-| ENTRY-03 | Phase 2 | Pending |
-| DIAG-01 | Phase 2 | Pending |
-| DIAG-02 | Phase 2 | Pending |
+| ENTRY-01 | Phase 2 | Complete |
+| ENTRY-02 | Phase 2 | Complete |
+| ENTRY-03 | Phase 2 | Complete |
+| DIAG-01 | Phase 2 | Complete |
+| DIAG-02 | Phase 2 | Complete |
 | DIAG-03 | Phase 2 | Pending |
 | DIAG-04 | Phase 4 | Pending |
 | TLS-01 | Phase 3 | Pending |
@@ -251,7 +251,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UX-01 | Phase 1 | Complete |
 | UX-02 | Phase 1 | Complete |
 | UX-03 | Phase 2 | Pending |
-| UX-04 | Phase 2 | Pending |
+| UX-04 | Phase 2 | Complete |
 | DIST-01 | Phase 1 | Complete |
 | DIST-02 | Phase 1 | Complete |
 | DIST-03 | Phase 1 | Complete |
