@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypedDict
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -27,7 +27,34 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-type TraefikData = dict[str, Any]
+
+class TraefikData(TypedDict, total=False):
+    """Shape of the coordinator's `data` attribute (Phase 2, CONTEXT.md D-04).
+
+    All keys are optional at runtime (DataUpdateCoordinator stores a dict via
+    its generic). ``total=False`` mirrors the Phase 1 behavior where any
+    individual key may be missing transiently. Partial-failure policy lives
+    in ``TraefikApiClient.fetch_all`` (CONTEXT.md D-07): on a non-auth error,
+    the entire payload is dropped so callers see a stale cycle rather than
+    mixed fresh+stale data.
+
+    NOTE: Phase 1 used a PEP-695 ``type TraefikData = dict[str, Any]`` alias.
+    The class form (TypedDict) is the canonical Phase 2 type — every
+    ``from .coordinator import TraefikData`` continues to resolve to a valid
+    type identifier (the TypedDict class itself). The PLAN.md 02-01 snippet
+    ``type TraefikData = TraefikData`` is a self-referential alias that ruff
+    + mypy both flag as a no-op redefinition; we keep the class form alone
+    and surface this in SUMMARY 02-01 as a deviation.
+    """
+
+    version: dict[str, Any]
+    entrypoints: list[dict[str, Any]]
+    http_routers: list[dict[str, Any]]
+    http_services: list[dict[str, Any]]
+    http_middlewares: list[dict[str, Any]]
+    overview: dict[str, Any]
+
+
 type TraefikConfigEntry = ConfigEntry["TraefikCoordinator"]
 
 
@@ -55,10 +82,21 @@ class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
         )
 
     async def _async_update_data(self) -> TraefikData:
-        """Fetch version + routers in parallel; map errors per CONTEXT.md D-15."""
+        """Fetch the six Traefik endpoints in parallel; map errors per CONTEXT.md D-07.
+
+        Partial-failure policy is enforced inside ``TraefikApiClient.fetch_all``
+        (CONTEXT.md D-07): any non-auth error drops the entire payload so
+        callers see a stale cycle rather than mixed fresh+stale data. Auth
+        errors propagate unchanged so this method only needs to translate
+        them to ``ConfigEntryAuthFailed``.
+        """
         try:
-            return await self.client.fetch_all()
+            result = await self.client.fetch_all()
         except TraefikAuthError as err:
             raise ConfigEntryAuthFailed from err
         except TraefikApiError as err:
             raise UpdateFailed(str(err)) from err
+        # ``fetch_all`` returns a plain dict that matches the TypedDict shape;
+        # cast at the boundary so the static type stays TraefikData (TypedDict
+        # instances ARE dicts at runtime).
+        return result  # type: ignore[return-value]

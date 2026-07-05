@@ -11,18 +11,13 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.util import slugify
 
+from .api import filter_internal_items
 from .entity import TraefikEntity
 
 if TYPE_CHECKING:
     from .coordinator import TraefikConfigEntry, TraefikCoordinator
 
 _HOST_FROM_RULE = re.compile(r"Host\(`([^`]+)`\)")
-_PROVIDER_SUFFIX_RE = re.compile(r"@\w+")  # Phase 1 defensive filter (PITFALLS #2)
-
-
-def _filter_user_routers(routers: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Drop Traefik-internal `@<provider>` suffixed routers."""
-    return [r for r in routers if not _PROVIDER_SUFFIX_RE.search(r.get("name", ""))]
 
 
 def _friendly_rule(rule: str | None) -> str | None:
@@ -41,7 +36,10 @@ async def async_setup_entry(
     """Set up Traefik router binary sensors for a config entry."""
     coordinator: TraefikCoordinator = entry.runtime_data
 
-    routers = _filter_user_routers(coordinator.data.get("routers") or [])
+    # Phase 2: read `http_routers` (was `routers` in Phase 1 — fetch_all now
+    # returns the renamed key per CONTEXT.md D-04). filter_internal_items is
+    # the canonical helper from api.py (replaces _filter_user_routers).
+    routers = filter_internal_items(coordinator.data.get("http_routers") or [])
     entities = [TraefikRouterBinarySensor(entry, coordinator, router) for router in routers]
     async_add_entities(entities)
 
@@ -58,7 +56,9 @@ class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
         router: dict[str, Any],
     ) -> None:
         router_name = router["name"]
-        super().__init__(entry, router_name)
+        # Phase 2: per-category device (CONTEXT.md D-01/D-02). The HTTP Routers
+        # device identifier is (DOMAIN, f"{entry.entry_id}_http_routers").
+        super().__init__(entry, category="http_routers", description_key=router_name)
         self._router = router
         self._attr_unique_id = f"{entry.entry_id}_http_router_{router_name}"
         # Explicit entity_id prefix per CONTEXT.md D-09/D-10.
@@ -79,6 +79,10 @@ class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
             "rule": self._router.get("rule"),
             "friendly_rule": _friendly_rule(self._router.get("rule")),
             "service": self._router.get("service"),
+            # ``name`` is the raw Traefik router identifier (CONTEXT.md D-20 /
+            # ROUTER-02). Useful on dashboards even when the entity_id slug
+            # mangles special characters.
+            "name": self._router.get("name"),
             "router_name": self._router.get("name"),
         }
 

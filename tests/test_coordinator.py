@@ -36,18 +36,30 @@ def _make_entry(**kwargs) -> MockConfigEntry:
     return MockConfigEntry(**defaults)
 
 
-async def test_setup_creates_coordinator_in_runtime_data(hass, aioclient_mock) -> None:
-    """Happy path: async_setup_entry creates the coordinator in entry.runtime_data."""
-    from custom_components.traefik.coordinator import TraefikCoordinator
-
+def _stub_all_endpoints(aioclient_mock, *, routers: list | None = None) -> None:
+    """Mock all six endpoints fetch_all() now requests (Phase 2 / CONTEXT.md D-04)."""
     aioclient_mock.get(
         f"{MOCK_URL}/api/version",
         json={"Version": "3.1.4", "Codename": "rancher", "StartDate": "2026-07-01"},
     )
+    aioclient_mock.get(f"{MOCK_URL}/api/entrypoints", json=[])
     aioclient_mock.get(
         f"{MOCK_URL}/api/http/routers",
-        json=[{"name": "r1", "rule": "Host(`x`)", "status": "enabled", "tls": {}}],
+        json=routers if routers is not None else [],
     )
+    aioclient_mock.get(f"{MOCK_URL}/api/http/services", json=[])
+    aioclient_mock.get(f"{MOCK_URL}/api/http/middlewares", json=[])
+    aioclient_mock.get(
+        f"{MOCK_URL}/api/overview",
+        json={"http": {"routers": [], "services": [], "middlewares": []}},
+    )
+
+
+async def test_setup_creates_coordinator_in_runtime_data(hass, aioclient_mock) -> None:
+    """Happy path: async_setup_entry creates the coordinator in entry.runtime_data."""
+    from custom_components.traefik.coordinator import TraefikCoordinator
+
+    _stub_all_endpoints(aioclient_mock)
 
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -63,11 +75,7 @@ async def test_setup_creates_coordinator_in_runtime_data(hass, aioclient_mock) -
 
 async def test_unload_returns_to_not_loaded(hass, aioclient_mock) -> None:
     """async_unload_entry clears state back to NOT_LOADED."""
-    aioclient_mock.get(
-        f"{MOCK_URL}/api/version",
-        json={"Version": "3.1.4", "Codename": "rancher", "StartDate": "2026-07-01"},
-    )
-    aioclient_mock.get(f"{MOCK_URL}/api/http/routers", json=[])
+    _stub_all_endpoints(aioclient_mock)
 
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -124,11 +132,7 @@ async def test_401_triggers_setup_error(hass, aioclient_mock) -> None:
 
 async def test_runtime_data_verify_ssl_defaults_true(hass, aioclient_mock) -> None:
     """If data lacks verify_ssl (set via UI), entry.options overrides default=True."""
-    aioclient_mock.get(
-        f"{MOCK_URL}/api/version",
-        json={"Version": "3.1.4", "Codename": "rancher", "StartDate": "2026-07-01"},
-    )
-    aioclient_mock.get(f"{MOCK_URL}/api/http/routers", json=[])
+    _stub_all_endpoints(aioclient_mock)
 
     entry = _make_entry(data={CONF_URL: MOCK_URL, CONF_API_KEY: "k"})
     entry.add_to_hass(hass)
