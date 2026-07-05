@@ -52,13 +52,9 @@ class TraefikApiClient:
                     headers=self._headers(),
                     ssl=self._verify_ssl,
                 ) as response:
-                    _LOGGER.debug(
-                        "path=%s status=%s", path, response.status
-                    )
+                    _LOGGER.debug("path=%s status=%s", path, response.status)
                     if response.status in (401, 403):
-                        raise TraefikAuthError(
-                            f"Auth failed for {path}: {response.status}"
-                        )
+                        raise TraefikAuthError(f"Auth failed for {path}: {response.status}")
                     response.raise_for_status()
                     return await response.json(content_type=None)
         except aiohttp.ClientResponseError as err:
@@ -66,21 +62,27 @@ class TraefikApiClient:
             if err.status in (401, 403):
                 raise TraefikAuthError(str(err)) from err
             raise TraefikApiError(str(err)) from err
-        except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as err:
+        except (TimeoutError, aiohttp.ClientConnectorError) as err:
             raise TraefikApiError(str(err)) from err
 
     # --- Endpoints used in Phase 1 ---
     async def get_version(self) -> dict[str, Any]:
         """GET /api/version — returns {Version, Codename, StartDate}."""
-        return await self._get("/api/version")
+        result = await self._get("/api/version")
+        assert isinstance(result, dict)
+        return result
 
     async def get_routers(self) -> list[dict[str, Any]]:
         """GET /api/http/routers."""
-        return await self._get("/api/http/routers")
+        result = await self._get("/api/http/routers")
+        assert isinstance(result, list)
+        return result
 
     async def get_overview(self) -> dict[str, Any]:
         """GET /api/overview — used by config flow for auth probe."""
-        return await self._get("/api/overview")
+        result = await self._get("/api/overview")
+        assert isinstance(result, dict)
+        return result
 
     async def fetch_all(self) -> dict[str, Any]:
         """Phase 1 parallel fetch: version + routers wrapped in one asyncio.gather."""

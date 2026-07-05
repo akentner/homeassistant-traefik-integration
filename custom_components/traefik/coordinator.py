@@ -39,9 +39,7 @@ class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
 
     def __init__(self, hass: HomeAssistant, entry: TraefikConfigEntry) -> None:
         """Construct coordinator from a config entry's data + options."""
-        scan_interval = entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-        )
+        scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         super().__init__(
             hass,
             _LOGGER,
@@ -53,9 +51,7 @@ class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
             session=aiohttp_client.async_get_clientsession(hass),
             base_url=entry.data[CONF_URL],
             api_key=entry.data[CONF_API_KEY],
-            verify_ssl=entry.options.get(
-                CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL
-            ),
+            verify_ssl=entry.options.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
         )
 
     async def _async_update_data(self) -> TraefikData:

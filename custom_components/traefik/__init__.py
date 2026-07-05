@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, PLATFORMS
+from .const import DOMAIN as DOMAIN
+from .const import PLATFORMS
 from .coordinator import TraefikConfigEntry, TraefikCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: TraefikConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> bool:
     """Set up Traefik from a config entry."""
     coordinator = TraefikCoordinator(hass, entry)
     # first_refresh raises ConfigEntryNotReady on transient failure, or
@@ -28,13 +26,11 @@ async def async_setup_entry(
     _LOGGER.debug(
         "Traefik integration ready: entry_id=%s, scan_interval=%ss",
         entry.entry_id,
-        coordinator.update_interval.total_seconds(),
+        coordinator.update_interval.total_seconds() if coordinator.update_interval else 0.0,
     )
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: TraefikConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> bool:
     """Unload a Traefik config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

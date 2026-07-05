@@ -45,7 +45,7 @@ class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
 
         url = self._entry.data.get("url", "")
         try:
-            return urlparse(url).hostname
+            return str(urlparse(url).hostname)
         except Exception:
             return None
 
@@ -53,5 +53,6 @@ class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
         data = self.coordinator.data or {}
         version = data.get("version") if isinstance(data, dict) else None
         if isinstance(version, dict):
-            return version.get("Version")
+            version_value = version.get("Version")
+            return str(version_value) if version_value is not None else None
         return None

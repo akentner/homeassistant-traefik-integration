@@ -2,12 +2,13 @@
 name = "homeassistant-traefik-integration"
 version = "1.0.0"
 description = "Home Assistant custom integration that exposes Traefik reverse-proxy state as entities"
-requires-python = ">=3.13"
+requires-python = ">=3.14.2"
 
 # Lint config in ./ruff.toml (not here)
 
 [dependency-groups]
 dev = [
+    "aioresponses>=0.7.9",
     "mypy>=2.1.0",
     "pytest>=9.0.0",
     "pytest-asyncio>=1.4.0",
@@ -23,5 +24,5 @@ testpaths = ["tests"]
 addopts = "--cov=custom_components.traefik --cov-report term-missing"
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 strict = true

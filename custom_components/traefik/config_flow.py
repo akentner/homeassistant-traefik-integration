@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 from aiohttp import ClientConnectorError, ClientResponseError
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
@@ -33,12 +33,8 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_URL): TextSelector(
-            TextSelectorConfig(type=TextSelectorType.URL)
-        ),
-        vol.Required(CONF_API_KEY): TextSelector(
-            TextSelectorConfig(type=TextSelectorType.PASSWORD)
-        ),
+        vol.Required(CONF_URL): TextSelector(TextSelectorConfig(type=TextSelectorType.URL)),
+        vol.Required(CONF_API_KEY): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
         vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): BooleanSelector(),
     }
 )
@@ -65,7 +61,7 @@ class ApiDisabled(Exception):
     """Traefik's `api: {}` block not enabled (404 on /api/overview)."""
 
 
-async def _validate_input(hass, data: dict[str, Any]) -> None:
+async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
     """Probe /api/overview and map errors to user-friendly exceptions."""
     client = TraefikApiClient(
         session=async_get_clientsession(hass),
@@ -82,7 +78,7 @@ async def _validate_input(hass, data: dict[str, Any]) -> None:
         if err.status == 404:
             raise ApiDisabled from err
         raise CannotConnect from err
-    except (ClientConnectorError, asyncio.TimeoutError, TraefikApiError):
+    except TimeoutError, ClientConnectorError, TraefikApiError:
         raise CannotConnect from None
 
 
@@ -92,7 +88,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the UI setup step."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -114,11 +110,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=user_input,
                 )
 
-        http_warning = (
-            ""
-            if (user_input or {}).get(CONF_URL, "").startswith("https://")
-            else "config_flow_warning_http"
-        )
+        http_warning = "" if (user_input or {}).get(CONF_URL, "").startswith("https://") else "config_flow_warning_http"
         return self.async_show_form(
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
@@ -128,7 +120,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_yaml(self, user_input: dict[str, Any] | None = None):
+    async def async_step_yaml(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle YAML import (CFG-02)."""
         errors: dict[str, str] = {}
         if user_input is not None:
