@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** — Scaffold `custom_components/traefik/`, Config Flow (completed 2026-07-05)
       + YAML, Coordinator, first router binary_sensor, HACS manifest
-- [ ] **Phase 2: Core Entities + Options + Reauth + Reload** — Entrypoint /
+- [x] **Phase 2: Core Entities + Options + Reauth + Reload** — Entrypoint / (completed 2026-07-05)
       Service / Overview sensors, Options Flow, reauth + reconfigure, reload
       service + button, stale entity cleanup
 - [ ] **Phase 3: TLS Certificate Expiry** — Spike → `tls.py` + `CertCoordinator`
@@ -112,7 +112,7 @@ Plans:
 - [x] 02-01: Foundation — TraefikEntity multi-device refactor + new api.py endpoints + filter_internal_items + TraefikData TypedDict + const.py extension
 - [x] 02-02: Config Flow — OptionsFlow + Reauth + Reconfigure + entry.add_update_listener + translation bundle updates
 - [x] 02-03: Entities — sensor.py (entrypoint + service + 3 aggregates) + button.py (reload) + binary_sensor.py (any-router-failing)
-- [ ] 02-04: Service + Stale Cleanup + Tests — module-level async_setup + reload handler with polling verification + stale entity cleanup listeners + integration tests
+- [x] 02-04: Service + Stale Cleanup + Tests — module-level async_setup + reload handler with polling verification + stale entity cleanup listeners + integration tests
 - [ ] 02-04: Stale entity cleanup via coordinator.async_add_listener + @<provider> filtering + integration tests with pytest-homeassistant-custom-component
 
 ### Phase 3: TLS Certificate Expiry
@@ -207,7 +207,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete    | 2026-07-05 |
-| 2. Core Entities + Options + Reauth + Reload | 3/4 | In Progress|  |
+| 2. Core Entities + Options + Reauth + Reload | 4/4 | Complete   | 2026-07-05 |
 | 3. TLS Certificate Expiry | 0/TBD | Not started | - |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
 

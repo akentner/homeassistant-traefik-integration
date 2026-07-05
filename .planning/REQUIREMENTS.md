@@ -82,7 +82,7 @@ Requirements for initial release. Each maps to a roadmap phase.
       router is reporting a non-`enabled` status — `BinarySensorDeviceClass.PROBLEM`.
 - [x] **DIAG-02**: A `button` entity triggers the `Reload` button device
       class and posts a refresh to Traefik when pressed.
-- [ ] **DIAG-03**: A `traefik.reload_routers` service is registered
+- [x] **DIAG-03**: A `traefik.reload_routers` service is registered
       during `async_setup` (not `async_setup_entry`) and verifies reload
       completion via polling.
 
@@ -148,7 +148,7 @@ Requirements for initial release. Each maps to a roadmap phase.
 - [x] **TEST-01**: Unit tests cover the API client (parsing, error paths,
       redaction safety) and the coordinator (poll cycle, exception
       mapping).
-- [ ] **TEST-02**: Integration tests using
+- [x] **TEST-02**: Integration tests using
       `pytest-homeassistant-custom-component` cover Config Flow
       (success, invalid auth, unreachable host), all entity platforms,
       options flow, reload service, and reauth flow.
@@ -241,7 +241,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENTRY-03 | Phase 2 | Complete |
 | DIAG-01 | Phase 2 | Complete |
 | DIAG-02 | Phase 2 | Complete |
-| DIAG-03 | Phase 2 | Pending |
+| DIAG-03 | Phase 2 | Complete |
 | DIAG-04 | Phase 4 | Pending |
 | TLS-01 | Phase 3 | Pending |
 | TLS-02 | Phase 3 | Pending |
@@ -262,7 +262,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-03 | Phase 4 | Pending |
 | DOCS-04 | Phase 4 | Pending |
 | TEST-01 | Phase 1 | Complete |
-| TEST-02 | Phase 2 | Pending |
+| TEST-02 | Phase 2 | Complete |
 | TEST-03 | Phase 1 | Complete |
 | TEST-04 | Phase 3 | Pending |
 
