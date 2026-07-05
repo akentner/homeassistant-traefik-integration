@@ -1,0 +1,27 @@
+[project]
+name = "homeassistant-traefik-integration"
+version = "1.0.0"
+description = "Home Assistant custom integration that exposes Traefik reverse-proxy state as entities"
+requires-python = ">=3.13"
+
+# Lint config in ./ruff.toml (not here)
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.0.0",
+    "pytest-homeassistant-custom-component>=0.13.345",
+    "ruff>=0.15.15",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "--cov=custom_components.traefik --cov-report term-missing"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
