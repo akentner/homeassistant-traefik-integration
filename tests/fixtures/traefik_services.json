@@ -1,0 +1,26 @@
+[
+  {
+    "name": "backend-api",
+    "type": "loadbalancer",
+    "loadbalancer": {
+      "servers": [{"url": "http://10.0.0.1:8000", "status": "UP"}],
+      "status": "OK"
+    },
+    "status": "enabled"
+  },
+  {
+    "name": "backend-warn",
+    "type": "loadbalancer",
+    "loadbalancer": {
+      "servers": [{"url": "http://10.0.0.2:8000", "status": "UP"}],
+      "status": "WARNING"
+    },
+    "status": "enabled"
+  },
+  {
+    "name": "api@internal",
+    "type": "loadbalancer",
+    "loadbalancer": {"servers": [], "status": "OK"},
+    "status": "enabled"
+  }
+]

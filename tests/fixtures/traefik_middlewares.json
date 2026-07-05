@@ -1,0 +1,5 @@
+[
+  {"name": "auth-headers", "type": "headers"},
+  {"name": "rate-limit", "type": "ratelimit"},
+  {"name": "strip@docker", "type": "stripprefix"}
+]
