@@ -65,7 +65,7 @@ DIST-01, DIST-02, DIST-03, DOCS-01, TEST-01, TEST-03 (22 requirements)
      hassfest blocks it for custom integrations), `hacs.json`, brand icons
      (`brand/icon.png` + `icon@2x.png`), a `pyproject.toml`, and a `README.md`
      documenting the HACS install path; `hassfest` validation passes.
-**Plans**: TBD (likely 2-3 plans: scaffold → coordinator+config_flow+first entity → docs+CI+tests)
+**Plans**: 4 plans (scaffold → coordinator+entity+__init__ → config_flow+router entity+docs → tests+CI)
 
 Plans:
 - [ ] 01-01: Project scaffold (manifest.json, hacs.json, const.py, brand/, pyproject.toml, .gitignore, LICENSE, ruff config)
