@@ -1,0 +1,30 @@
+[
+  {
+    "name": "my-router",
+    "rule": "Host(`hass.example.com`) && PathPrefix(`/api`)",
+    "service": "backend-api",
+    "status": "enabled",
+    "tls": {}
+  },
+  {
+    "name": "broken-router",
+    "rule": "Host(`broken.example.com`)",
+    "service": "backend-broken",
+    "status": "error",
+    "tls": null
+  },
+  {
+    "name": "api@internal",
+    "rule": "Host(`traefik.example.com`)",
+    "service": "api@internal",
+    "status": "enabled",
+    "tls": {}
+  },
+  {
+    "name": "warn-router",
+    "rule": "Host(`warn.example.com`)",
+    "service": "backend-warn",
+    "status": "warning",
+    "tls": {}
+  }
+]
