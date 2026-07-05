@@ -106,12 +106,13 @@ TEST-02 (15 requirements)
      `api@internal`, `strip@docker`) are filtered out at coordinator level
      (HA's entity-ID regex rejects `@`); routers removed in Traefik are
      pruned from HA via `coordinator.async_add_listener` cleanup hook.
-**Plans**: TBD (likely 2-3 plans)
+**Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 02-01: Options + reauth + reconfigure flows in config_flow.py + OptionsFlow bound via entry.add_update_listener
-- [ ] 02-02: sensor.py (entrypoint + service + overview) + binary_sensor.py (any-router-failing) + button.py (reload button)
-- [ ] 02-03: services.yaml + traefik.reload_routers handler registered in async_setup (NOT async_setup_entry), refresh polling verification
+- [ ] 02-01: Foundation — TraefikEntity multi-device refactor + new api.py endpoints + filter_internal_items + TraefikData TypedDict + const.py extension
+- [ ] 02-02: Config Flow — OptionsFlow + Reauth + Reconfigure + entry.add_update_listener + translation bundle updates
+- [ ] 02-03: Entities — sensor.py (entrypoint + service + 3 aggregates) + button.py (reload) + binary_sensor.py (any-router-failing)
+- [ ] 02-04: Service + Stale Cleanup + Tests — module-level async_setup + reload handler with polling verification + stale entity cleanup listeners + integration tests
 - [ ] 02-04: Stale entity cleanup via coordinator.async_add_listener + @<provider> filtering + integration tests with pytest-homeassistant-custom-component
 
 ### Phase 3: TLS Certificate Expiry
