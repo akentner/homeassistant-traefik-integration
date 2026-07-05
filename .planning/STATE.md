@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: Phase 1 context gathered
+last_updated: "2026-07-05T21:50:49.326Z"
+last_activity: 2026-07-05 — Roadmap created (4 phases, 49 v1 requirements
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
 # Project State
 
 ## Project Reference
@@ -23,6 +39,7 @@ Progress: [░░░░░░░░░░] 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: — min
 - Total execution time: 0.0 hours
@@ -37,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 | 4. Quality + Diagnostics + Polish + HACS | 0 | TBD | — |
 
 **Recent Trend:**
+
 - Last 5 plans: — (none yet)
 - Trend: —
 
@@ -53,10 +71,12 @@ Recent decisions affecting current work:
   HACS-distributable; Config Flow + YAML; per-router/per-cert entities;
   `aiohttp` over `requests`. (All listed in PROJECT.md — to be moved to
   Validated after Phase 1 ships.)
+
 - [Phase 3 — pending]: TLS handshake uses stdlib `ssl` (no `cryptography`
   import), `asyncio.to_thread` wrapper, separate `CertCoordinator` with
   6-hour cadence. Spike to validate against 3+ real Traefik deployments
   before Phase 3 planning.
+
 - [Phase 2 — pending]: HA quality-scale rule "Polling intervals are NOT
   user-configurable" — scan-interval override is opt-in via Options Flow
   but quality-scale Bronze is targeted without it (decide during Phase 2
@@ -73,6 +93,7 @@ None yet.
   chains, wildcard certs, IPv6). Spike should validate 3+ real Traefik
   deployments and confirm format-string loop covers observed `notAfter`
   shapes.
+
 - `requirementS.md` footer says `46 total` but the traceability table
   contains 49 rows (CFG:6 + API:6 + COORD:4 + ROUTER:4 + ENTRY:3 +
   DIAG:4 + TLS:5 + UX:4 + DIST:5 + DOCS:4 + TEST:4 = 49). Table itself
@@ -80,7 +101,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05
-Stopped at: Roadmap created; all 4 phases written with success criteria;
+Last session: 2026-07-05T21:50:49.309Z
+Stopped at: Phase 1 context gathered
 49/49 v1 requirements mapped; commit pending.
-Resume file: None
+Resume file: .planning/phases/01-foundation/01-CONTEXT.md
