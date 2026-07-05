@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_NAME, DOMAIN
@@ -14,30 +14,73 @@ if TYPE_CHECKING:
     pass
 
 
+# Per-category model labels for the multi-device model (CONTEXT.md D-01).
+# Each Traefik category becomes its own HA device; the Traefik integration is
+# the manufacturer and the category is the model.
+_CATEGORY_TO_MODEL: Final[dict[str, str]] = {
+    "http_routers": "HTTP Routers",
+    "http_services": "HTTP Services",
+    "http_entrypoints": "HTTP Entrypoints",
+    "overview": "Overview",
+    "diagnostics": "Diagnostics",
+}
+
+
+def _category_to_model(category: str) -> str:
+    """Return the human-readable model label for a category.
+
+    Falls back to the raw category string so a typo in a new platform's
+    category still produces a usable device model rather than crashing.
+    """
+    return _CATEGORY_TO_MODEL.get(category, category)
+
+
 class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
-    """Common base for all Traefik entities (binary_sensor, sensor, button)."""
+    """Common base for all Traefik entities (binary_sensor, sensor, button).
+
+    Each entity registers under a per-category HA device — the integration
+    identifier is ``(DOMAIN, f"{entry.entry_id}_{category}")``. The legacy
+    Phase 1 single-device identifier ``(DOMAIN, entry.entry_id)`` is gone;
+    existing HA installations will see a new device row in the registry on
+    first restart after this migration (device-registry IDs are opaque so
+    this is unavoidable when the shape of the identifier changes). See
+    SUMMARY 02-01 for the regression-risk note.
+    """
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
         entry: TraefikConfigEntry,
-        router_name: str,
+        category: str,
+        *,
+        description_key: str | None = None,
     ) -> None:
         super().__init__(entry.runtime_data)
         self._entry = entry
-        self._router_name = router_name
+        self._category = category
+        # Back-compat alias: the Phase 1 binary_sensor code reads
+        # ``self._router_name`` for the router label. New platforms can ignore
+        # the attribute — it's a thin alias for ``description_key`` (or "" when
+        # the entity is single-instance, e.g. aggregates on the Overview device).
+        self._router_name = description_key or ""
 
     @property
     def device_info(self) -> DeviceInfo:
         url_host = self._url_host()
+        model = _category_to_model(self._category)
+        name = (
+            f"{url_host} Traefik \u2014 {model}"
+            if url_host
+            else f"{DEFAULT_NAME} \u2014 {model}"
+        )
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry.entry_id}")},
+            identifiers={(DOMAIN, f"{self._entry.entry_id}_{self._category}")},
             manufacturer="Traefik",
-            model="HTTP Routers",
-            name=f"{url_host} {DEFAULT_NAME}" if url_host else DEFAULT_NAME,
+            model=model,
+            name=name,
             sw_version=self._sw_version(),
-            entry_type=None,
+            entry_type=DeviceEntryType.SERVICE,
         )
 
     def _url_host(self) -> str | None:
