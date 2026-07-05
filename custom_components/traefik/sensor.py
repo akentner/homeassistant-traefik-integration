@@ -127,12 +127,7 @@ async def async_setup_entry(
         data = coordinator.data if isinstance(coordinator.data, dict) else {}
         svcs = data.get("http_services") if isinstance(data, dict) else None
         if isinstance(svcs, list):
-            current = {
-                s["name"]
-                for s in filter_internal_items(
-                    [item for item in svcs if isinstance(item, dict)]
-                )
-            }
+            current = {s["name"] for s in filter_internal_items([item for item in svcs if isinstance(item, dict)])}
         prefix = f"{entry.entry_id}_http_service_"
         for reg_entry in list(registry.entities.values()):
             unique_id = reg_entry.unique_id or ""

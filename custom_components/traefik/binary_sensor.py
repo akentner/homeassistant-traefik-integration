@@ -78,11 +78,7 @@ async def async_setup_entry(
         data = coordinator.data if isinstance(coordinator.data, dict) else {}
         routers_data = data.get("http_routers") if isinstance(data, dict) else None
         if isinstance(routers_data, list):
-            current_routers = {
-                r["name"]
-                for r in routers_data
-                if isinstance(r, dict) and "name" in r
-            }
+            current_routers = {r["name"] for r in routers_data if isinstance(r, dict) and "name" in r}
         prefix = f"{entry.entry_id}_http_router_"
         for reg_entry in list(registry.entities.values()):
             unique_id = reg_entry.unique_id
