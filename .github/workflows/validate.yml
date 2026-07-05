@@ -1,0 +1,54 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync dev dependencies
+        run: uv sync
+
+      - name: Ruff lint
+        run: uv run ruff check custom_components tests
+
+      - name: Ruff format check
+        run: uv run ruff format --check custom_components tests
+
+      - name: Mypy strict type check
+        run: uv run mypy --strict custom_components/traefik
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Sync dev dependencies
+        run: uv sync
+      - name: Pytest with coverage
+        run: uv run pytest tests/ -v --cov
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+        with:
+          source: ${{ github.workspace }}
