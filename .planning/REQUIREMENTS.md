@@ -13,11 +13,11 @@ Requirements for initial release. Each maps to a roadmap phase.
       config flow by providing the Traefik API URL and a bearer token.
 - [x] **CFG-02**: User can alternatively configure the integration via
       `configuration.yaml` for users who prefer YAML / pinned releases.
-- [ ] **CFG-03**: User can reconfigure the Traefik URL without deleting and
+- [x] **CFG-03**: User can reconfigure the Traefik URL without deleting and
       re-adding the integration entry.
-- [ ] **CFG-04**: When the API token becomes invalid (401), the integration
+- [x] **CFG-04**: When the API token becomes invalid (401), the integration
       triggers Home Assistant's reauth flow automatically.
-- [ ] **CFG-05**: User can configure integration options after setup (TLS
+- [x] **CFG-05**: User can configure integration options after setup (TLS
       verification, scan interval, certificate warning threshold).
 - [x] **CFG-06**: User is shielded from "Updating Traefik failed" spam
       during transient API outages by surfacing `ConfigEntryNotReady` and
@@ -108,7 +108,7 @@ Requirements for initial release. Each maps to a roadmap phase.
       `sw_version` set from `/api/version`.
 - [x] **UX-02**: Entities use HA's modern `_attr_has_entity_name=True`
       convention so the UI displays `<Device> <Entity Name>`.
-- [ ] **UX-03**: Stale entities (e.g. a router removed in Traefik) are
+- [x] **UX-03**: Stale entities (e.g. a router removed in Traefik) are
       pruned via `coordinator.async_add_listener` cleanup hook.
 - [x] **UX-04**: All entities expose additional state attributes
       (Traefik IDs, rule excerpts, raw timestamps) so dashboards and
@@ -218,9 +218,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CFG-01 | Phase 1 | Complete |
 | CFG-02 | Phase 1 | Complete |
-| CFG-03 | Phase 2 | Pending |
-| CFG-04 | Phase 2 | Pending |
-| CFG-05 | Phase 2 | Pending |
+| CFG-03 | Phase 2 | Complete |
+| CFG-04 | Phase 2 | Complete |
+| CFG-05 | Phase 2 | Complete |
 | CFG-06 | Phase 1 | Complete |
 | API-01 | Phase 1 | Complete |
 | API-02 | Phase 1 | Complete |
@@ -250,7 +250,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TLS-05 | Phase 3 | Pending |
 | UX-01 | Phase 1 | Complete |
 | UX-02 | Phase 1 | Complete |
-| UX-03 | Phase 2 | Pending |
+| UX-03 | Phase 2 | Complete |
 | UX-04 | Phase 2 | Complete |
 | DIST-01 | Phase 1 | Complete |
 | DIST-02 | Phase 1 | Complete |
