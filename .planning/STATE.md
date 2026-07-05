@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 01-04-PLAN.md — phase 1 fully shipped
-last_updated: "2026-07-05T22:29:15.807Z"
+last_updated: "2026-07-05T22:29:27.893Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 4
@@ -28,8 +28,8 @@ first router binary_sensor + HACS manifest)
 
 ## Current Position
 
-Phase: 1 (Foundation (scaffold + Config Flow + Coordinator + first router binary_sensor + HACS manifest)) — EXECUTING
-Plan: 2 of 4
+Phase: 2
+Plan: Not started
 Status: Ready to execute
 Last activity: 2026-07-05
 mapped, 0 unmapped).

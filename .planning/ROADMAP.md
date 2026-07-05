@@ -205,7 +205,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 4/4 | Complete   | 2026-07-05 |
+| 1. Foundation | 4/4 | Complete    | 2026-07-05 |
 | 2. Core Entities + Options + Reauth + Reload | 0/TBD | Not started | - |
 | 3. TLS Certificate Expiry | 0/TBD | Not started | - |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
