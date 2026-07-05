@@ -14,9 +14,11 @@ Entity count per config entry (after `async_setup_entry` returns):
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 
 from .api import filter_internal_items
@@ -24,6 +26,8 @@ from .entity import TraefikEntity
 
 if TYPE_CHECKING:
     from .coordinator import TraefikConfigEntry, TraefikCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -90,6 +94,57 @@ async def async_setup_entry(
     ]
 
     async_add_entities(entrypoint_entities + service_entities + aggregate_entities)
+
+    # Stale entity cleanup (CONTEXT.md D-18, gatus binary_sensor.py:49-71).
+    # Entrypoints + services that disappear from coordinator.data are removed
+    # from the entity registry on the next refresh cycle. Aggregate counters
+    # on the Overview device (CONTEXT.md D-19) are NEVER deleted — their
+    # unique_id prefix is ``_overview_`` and is skipped below.
+    registry = er.async_get(hass)
+
+    def _remove_stale_entrypoints() -> None:
+        if not coordinator.last_update_success:
+            return
+        current: set[str] = set()
+        data = coordinator.data if isinstance(coordinator.data, dict) else {}
+        eps = data.get("entrypoints") if isinstance(data, dict) else None
+        if isinstance(eps, list):
+            current = {ep["name"] for ep in eps if isinstance(ep, dict) and "name" in ep}
+        prefix = f"{entry.entry_id}_http_entrypoint_"
+        for reg_entry in list(registry.entities.values()):
+            unique_id = reg_entry.unique_id or ""
+            if not unique_id.startswith(prefix):
+                continue
+            ep_name = unique_id.removeprefix(prefix)
+            if ep_name and ep_name not in current:
+                _LOGGER.debug("Removing stale entrypoint entity: %s", reg_entry.entity_id)
+                registry.async_remove(reg_entry.entity_id)
+
+    def _remove_stale_services() -> None:
+        if not coordinator.last_update_success:
+            return
+        current: set[str] = set()
+        data = coordinator.data if isinstance(coordinator.data, dict) else {}
+        svcs = data.get("http_services") if isinstance(data, dict) else None
+        if isinstance(svcs, list):
+            current = {
+                s["name"]
+                for s in filter_internal_items(
+                    [item for item in svcs if isinstance(item, dict)]
+                )
+            }
+        prefix = f"{entry.entry_id}_http_service_"
+        for reg_entry in list(registry.entities.values()):
+            unique_id = reg_entry.unique_id or ""
+            if not unique_id.startswith(prefix):
+                continue
+            svc_name = unique_id.removeprefix(prefix)
+            if svc_name and svc_name not in current:
+                _LOGGER.debug("Removing stale service entity: %s", reg_entry.entity_id)
+                registry.async_remove(reg_entry.entity_id)
+
+    entry.async_on_unload(coordinator.async_add_listener(_remove_stale_entrypoints))
+    entry.async_on_unload(coordinator.async_add_listener(_remove_stale_services))
 
 
 def _dict_or_empty(value: Any) -> dict[str, Any]:

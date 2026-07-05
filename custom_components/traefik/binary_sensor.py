@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -9,6 +10,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 
 from .api import filter_internal_items
@@ -16,6 +18,8 @@ from .entity import TraefikEntity
 
 if TYPE_CHECKING:
     from .coordinator import TraefikConfigEntry, TraefikCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 _HOST_FROM_RULE = re.compile(r"Host\(`([^`]+)`\)")
 
@@ -51,6 +55,45 @@ async def async_setup_entry(
     router_entities = [TraefikRouterBinarySensor(entry, coordinator, router) for router in routers]
     any_failing_entity = TraefikAnyRouterFailingBinarySensor(entry, coordinator)
     async_add_entities([*router_entities, any_failing_entity])
+
+    # Stale entity cleanup (CONTEXT.md D-18, gatus binary_sensor.py:49-71).
+    # Routers that disappear from coordinator.data are removed from the
+    # entity registry on the next refresh cycle. Aggregate entities
+    # (``TraefikAnyRouterFailingBinarySensor``) are NEVER deleted
+    # (CONTEXT.md D-19 — single instance per entry, category='diagnostics'
+    # so its unique_id prefix differs from ``http_router_`` and is skipped
+    # below).
+    registry = er.async_get(hass)
+
+    def _remove_stale_routers() -> None:
+        """Drop registry entries for routers no longer in coordinator.data.
+
+        Defensive: if the coordinator fetch failed, skip cleanup — we
+        don't want a transient outage to delete every entity (PITFALLS
+        "stale-state-on-network-blip").
+        """
+        if not coordinator.last_update_success:
+            return
+        current_routers: set[str] = set()
+        data = coordinator.data if isinstance(coordinator.data, dict) else {}
+        routers_data = data.get("http_routers") if isinstance(data, dict) else None
+        if isinstance(routers_data, list):
+            current_routers = {
+                r["name"]
+                for r in routers_data
+                if isinstance(r, dict) and "name" in r
+            }
+        prefix = f"{entry.entry_id}_http_router_"
+        for reg_entry in list(registry.entities.values()):
+            unique_id = reg_entry.unique_id
+            if not unique_id or not unique_id.startswith(prefix):
+                continue
+            router_name = unique_id.removeprefix(prefix)
+            if router_name and router_name not in current_routers:
+                _LOGGER.debug("Removing stale router entity: %s", reg_entry.entity_id)
+                registry.async_remove(reg_entry.entity_id)
+
+    entry.async_on_unload(coordinator.async_add_listener(_remove_stale_routers))
 
 
 class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
