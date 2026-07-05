@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Traefik",
+        "description": "Provide the URL of your Traefik instance and the API key from your Traefik static config (api.dashboard / api.insecure).",
+        "data": {
+          "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
+          "api_key": "Bearer token",
+          "verify_ssl": "Verify TLS certificate (disable for self-signed)"
+        }
+      },
+      "yaml": {
+        "title": "YAML configuration detected",
+        "description": "Configure traefik: block in configuration.yaml. The integration validates the URL + token before saving."
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to reach Traefik \u2014 check URL, network, and that the API is enabled.",
+      "invalid_auth": "Invalid bearer token. Rotate the token in Traefik's static config.",
+      "api_disabled": "Traefik's API is not enabled \u2014 add `api: insecure: true` or `api: dashboard: true` to your static config.",
+      "unknown": "Unexpected error \u2014 see logs."
+    },
+    "abort": {
+      "already_configured": "This Traefik instance is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Traefik options",
+        "data": {
+          "scan_interval": "Polling interval (seconds, 15-300)"
+        }
+      }
+    }
+  }
+}
