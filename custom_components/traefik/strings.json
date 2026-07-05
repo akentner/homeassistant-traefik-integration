@@ -8,11 +8,30 @@
           "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
           "api_key": "Bearer token",
           "verify_ssl": "Verify TLS certificate (disable for self-signed)"
+        },
+        "description_placeholders": {
+          "http_warning": "Warning: plain HTTP transmits the bearer token in cleartext. Use HTTPS whenever possible."
         }
       },
       "yaml": {
         "title": "YAML configuration detected",
         "description": "Configure traefik: block in configuration.yaml. The integration validates the URL + token before saving."
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Traefik",
+        "description": "The Traefik bearer token has been rejected (HTTP 401/403) \u2014 enter the new token from your Traefik static config to continue polling.",
+        "data": {
+          "api_key": "New bearer token"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Traefik",
+        "description": "Update the Traefik base URL and/or bearer token \u2014 the integration will reload against the new endpoint.",
+        "data": {
+          "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
+          "api_key": "Bearer token",
+          "verify_ssl": "Verify TLS certificate (disable for self-signed)"
+        }
       }
     },
     "error": {
@@ -22,15 +41,49 @@
       "unknown": "Unexpected error \u2014 see logs."
     },
     "abort": {
-      "already_configured": "This Traefik instance is already configured."
+      "already_configured": "This Traefik instance is already configured.",
+      "reauth_successful": "Traefik reauthenticated."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Traefik options",
+        "description": "Adjust polling cadence, TLS verification, and the certificate warning threshold \u2014 URL changes use the separate Reconfigure flow.",
         "data": {
-          "scan_interval": "Polling interval (seconds, 15-300)"
+          "scan_interval": "Polling interval (seconds, 15-300)",
+          "verify_ssl": "Verify TLS certificate (disable for self-signed)",
+          "tls_warn_days": "Certificate warning threshold (days before expiry, 1-90)"
+        },
+        "errors": {
+          "scan_interval_out_of_range": "Polling interval must be between 15 and 300 seconds."
+        }
+      }
+    }
+  },
+  "reauth": {
+    "step": {
+      "confirm": {
+        "title": "Reauthenticate Traefik",
+        "description": "The Traefik bearer token has been rejected (HTTP 401/403) \u2014 enter the new token from your Traefik static config to continue polling.",
+        "data": {
+          "api_key": "New bearer token"
+        }
+      }
+    },
+    "abort": {
+      "reauth_successful": "Traefik reauthenticated."
+    }
+  },
+  "reconfigure": {
+    "step": {
+      "user": {
+        "title": "Reconfigure Traefik",
+        "description": "Update the Traefik base URL and/or bearer token \u2014 the integration will reload against the new endpoint.",
+        "data": {
+          "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
+          "api_key": "Bearer token",
+          "verify_ssl": "Verify TLS certificate (disable for self-signed)"
         }
       }
     }
