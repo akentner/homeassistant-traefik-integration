@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Configuration & Setup (CFG)
 
-- [ ] **CFG-01**: User can configure the integration via the Home Assistant UI
+- [x] **CFG-01**: User can configure the integration via the Home Assistant UI
       config flow by providing the Traefik API URL and a bearer token.
-- [ ] **CFG-02**: User can alternatively configure the integration via
+- [x] **CFG-02**: User can alternatively configure the integration via
       `configuration.yaml` for users who prefer YAML / pinned releases.
 - [ ] **CFG-03**: User can reconfigure the Traefik URL without deleting and
       re-adding the integration entry.
@@ -19,44 +19,44 @@ Requirements for initial release. Each maps to a roadmap phase.
       triggers Home Assistant's reauth flow automatically.
 - [ ] **CFG-05**: User can configure integration options after setup (TLS
       verification, scan interval, certificate warning threshold).
-- [ ] **CFG-06**: User is shielded from "Updating Traefik failed" spam
+- [x] **CFG-06**: User is shielded from "Updating Traefik failed" spam
       during transient API outages by surfacing `ConfigEntryNotReady` and
       retrying with backoff.
 
 ### API Client (API)
 
-- [ ] **API-01**: The integration connects to Traefik over HTTP using the
+- [x] **API-01**: The integration connects to Traefik over HTTP using the
       shared HA `aiohttp.ClientSession` (never creates its own).
-- [ ] **API-02**: The integration calls `/api/version`, `/api/entrypoints`,
+- [x] **API-02**: The integration calls `/api/version`, `/api/entrypoints`,
       `/api/http/routers`, `/api/http/services`, `/api/http/middlewares`,
       and `/api/overview` in parallel via `asyncio.gather`.
-- [ ] **API-03**: All API requests carry the bearer token in an
+- [x] **API-03**: All API requests carry the bearer token in an
       `Authorization` header built per-request — never as a default header
       on a long-lived session.
-- [ ] **API-04**: The API client raises `TraefikAuthError` on HTTP 401 and
+- [x] **API-04**: The API client raises `TraefikAuthError` on HTTP 401 and
       `TraefikApiError` on other non-2xx responses — never logs the token.
 - [ ] **API-05**: The API client can trigger `traefik.reload_routers` via
       `POST /api/http/routers/refresh` and report whether the refresh
       actually completed (Traefik returns 200 before reload finishes).
-- [ ] **API-06**: The API client supports HTTP and HTTPS targets, with
+- [x] **API-06**: The API client supports HTTP and HTTPS targets, with
       optional TLS verification configurable per-entry.
 
 ### Coordinator (COORD)
 
-- [ ] **COORD-01**: Polling cycle completes in `≤10s` per fetch and runs on
+- [x] **COORD-01**: Polling cycle completes in `≤10s` per fetch and runs on
       the HA event loop without blocking.
-- [ ] **COORD-02**: All parallel fetches wrapped in `asyncio.timeout(10)` so
+- [x] **COORD-02**: All parallel fetches wrapped in `asyncio.timeout(10)` so
       one slow endpoint does not stall the cycle.
-- [ ] **COORD-03**: Coordinator raises `ConfigEntryAuthFailed` on 401 and
+- [x] **COORD-03**: Coordinator raises `ConfigEntryAuthFailed` on 401 and
       `UpdateFailed` on transient errors — the right exception determines
       whether the user sees reauth or retry.
-- [ ] **COORD-04**: First refresh awaited via
+- [x] **COORD-04**: First refresh awaited via
       `coordinator.async_config_entry_first_refresh()` in
       `async_setup_entry`, so initial state appears immediately on restart.
 
 ### Entities — Routers (CORE-04)
 
-- [ ] **ROUTER-01**: A `binary_sensor` exists for each Traefik router,
+- [x] **ROUTER-01**: A `binary_sensor` exists for each Traefik router,
       with state `on` when the router is `enabled` and `off` when
       `disabled` or errored — `BinarySensorDeviceClass.RUNNING`.
 - [ ] **ROUTER-02**: Each router entity exposes the Traefik router `name`,
@@ -64,7 +64,7 @@ Requirements for initial release. Each maps to a roadmap phase.
       extra-state-attributes for dashboards and automations.
 - [ ] **ROUTER-03**: Traefik router names containing `@` are filtered at
       coordinator level (HA entity-ID regex rejects `@`).
-- [ ] **ROUTER-04**: Every router entity has a stable `unique_id` so
+- [x] **ROUTER-04**: Every router entity has a stable `unique_id` so
       re-setup does not duplicate entries.
 
 ### Entities — Entrypoints, Services, Overview (CORE-05, CORE-06, DIAG-01)
@@ -104,9 +104,9 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Platform & UX (UX)
 
-- [ ] **UX-01**: Entities grouped under a single "Traefik" device with
+- [x] **UX-01**: Entities grouped under a single "Traefik" device with
       `sw_version` set from `/api/version`.
-- [ ] **UX-02**: Entities use HA's modern `_attr_has_entity_name=True`
+- [x] **UX-02**: Entities use HA's modern `_attr_has_entity_name=True`
       convention so the UI displays `<Device> <Entity Name>`.
 - [ ] **UX-03**: Stale entities (e.g. a router removed in Traefik) are
       pruned via `coordinator.async_add_listener` cleanup hook.
@@ -116,12 +116,12 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Distribution & Quality (DIST)
 
-- [ ] **DIST-01**: Integration ships with `manifest.json` registered for
+- [x] **DIST-01**: Integration ships with `manifest.json` registered for
       domain `traefik`, `hacs.json` ready for HACS, and `brand/` icon
       assets (`icon.png` 256×256, `icon@2x.png` 512×512).
-- [ ] **DIST-02**: `manifest.json` declares `homeassistant: "2025.4.0"`
+- [x] **DIST-02**: `manifest.json` declares `homeassistant: "2025.4.0"`
       minimum and `"requirements": []` (HA Core bundles everything).
-- [ ] **DIST-03**: `manifest.json` deliberately omits `quality_scale`
+- [x] **DIST-03**: `manifest.json` deliberately omits `quality_scale`
       (hassfest blocks it for custom integrations).
 - [ ] **DIST-04**: GitHub Actions include `hassfest`, HACS Action, and
       pytest workflows; the release tag is enforced to match the manifest
@@ -131,7 +131,7 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Documentation (DOCS-01)
 
-- [ ] **DOCS-01**: A `README.md` documents HACS install, manual install,
+- [x] **DOCS-01**: A `README.md` documents HACS install, manual install,
       every configuration option, and example dashboards / automations
       (including a "notify when a router goes down" pattern and a
       "warn me N days before TLS expiry" pattern).
@@ -145,14 +145,14 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Testing (TEST-01)
 
-- [ ] **TEST-01**: Unit tests cover the API client (parsing, error paths,
+- [x] **TEST-01**: Unit tests cover the API client (parsing, error paths,
       redaction safety) and the coordinator (poll cycle, exception
       mapping).
 - [ ] **TEST-02**: Integration tests using
       `pytest-homeassistant-custom-component` cover Config Flow
       (success, invalid auth, unreachable host), all entity platforms,
       options flow, reload service, and reauth flow.
-- [ ] **TEST-03**: A test fixture captures a realistic Traefik `/api/...`
+- [x] **TEST-03**: A test fixture captures a realistic Traefik `/api/...`
       payload so integration tests stay hermetic.
 - [ ] **TEST-04**: TLS parsing tests cover ≥3 known `notAfter` format
       strings and ≥2 invalid format strings (graceful unavailable state).
@@ -216,26 +216,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | Phase 1 | Pending |
-| CFG-02 | Phase 1 | Pending |
+| CFG-01 | Phase 1 | Complete |
+| CFG-02 | Phase 1 | Complete |
 | CFG-03 | Phase 2 | Pending |
 | CFG-04 | Phase 2 | Pending |
 | CFG-05 | Phase 2 | Pending |
-| CFG-06 | Phase 1 | Pending |
-| API-01 | Phase 1 | Pending |
-| API-02 | Phase 1 | Pending |
-| API-03 | Phase 1 | Pending |
-| API-04 | Phase 1 | Pending |
+| CFG-06 | Phase 1 | Complete |
+| API-01 | Phase 1 | Complete |
+| API-02 | Phase 1 | Complete |
+| API-03 | Phase 1 | Complete |
+| API-04 | Phase 1 | Complete |
 | API-05 | Phase 2 | Pending |
-| API-06 | Phase 1 | Pending |
-| COORD-01 | Phase 1 | Pending |
-| COORD-02 | Phase 1 | Pending |
-| COORD-03 | Phase 1 | Pending |
-| COORD-04 | Phase 1 | Pending |
-| ROUTER-01 | Phase 1 | Pending |
+| API-06 | Phase 1 | Complete |
+| COORD-01 | Phase 1 | Complete |
+| COORD-02 | Phase 1 | Complete |
+| COORD-03 | Phase 1 | Complete |
+| COORD-04 | Phase 1 | Complete |
+| ROUTER-01 | Phase 1 | Complete |
 | ROUTER-02 | Phase 2 | Pending |
 | ROUTER-03 | Phase 2 | Pending |
-| ROUTER-04 | Phase 1 | Pending |
+| ROUTER-04 | Phase 1 | Complete |
 | ENTRY-01 | Phase 2 | Pending |
 | ENTRY-02 | Phase 2 | Pending |
 | ENTRY-03 | Phase 2 | Pending |
@@ -248,22 +248,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TLS-03 | Phase 3 | Pending |
 | TLS-04 | Phase 3 | Pending |
 | TLS-05 | Phase 3 | Pending |
-| UX-01 | Phase 1 | Pending |
-| UX-02 | Phase 1 | Pending |
+| UX-01 | Phase 1 | Complete |
+| UX-02 | Phase 1 | Complete |
 | UX-03 | Phase 2 | Pending |
 | UX-04 | Phase 2 | Pending |
-| DIST-01 | Phase 1 | Pending |
-| DIST-02 | Phase 1 | Pending |
-| DIST-03 | Phase 1 | Pending |
+| DIST-01 | Phase 1 | Complete |
+| DIST-02 | Phase 1 | Complete |
+| DIST-03 | Phase 1 | Complete |
 | DIST-04 | Phase 4 | Pending |
 | DIST-05 | Phase 4 | Pending |
-| DOCS-01 | Phase 1 | Pending |
+| DOCS-01 | Phase 1 | Complete |
 | DOCS-02 | Phase 4 | Pending |
 | DOCS-03 | Phase 4 | Pending |
 | DOCS-04 | Phase 4 | Pending |
-| TEST-01 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 2 | Pending |
-| TEST-03 | Phase 1 | Pending |
+| TEST-03 | Phase 1 | Complete |
 | TEST-04 | Phase 3 | Pending |
 
 **Coverage:**

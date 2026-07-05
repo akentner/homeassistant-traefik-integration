@@ -20,7 +20,7 @@ and HACS publication.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** — Scaffold `custom_components/traefik/`, Config Flow
+- [x] **Phase 1: Foundation** — Scaffold `custom_components/traefik/`, Config Flow (completed 2026-07-05)
       + YAML, Coordinator, first router binary_sensor, HACS manifest
 - [ ] **Phase 2: Core Entities + Options + Reauth + Reload** — Entrypoint /
       Service / Overview sensors, Options Flow, reauth + reconfigure, reload
@@ -68,10 +68,10 @@ DIST-01, DIST-02, DIST-03, DOCS-01, TEST-01, TEST-03 (22 requirements)
 **Plans**: 4 plans (scaffold → coordinator+entity+__init__ → config_flow+router entity+docs → tests+CI)
 
 Plans:
-- [ ] 01-01: Project scaffold (manifest.json, hacs.json, const.py, brand/, pyproject.toml, .gitignore, LICENSE, ruff config)
-- [ ] 01-02: api.py + coordinator.py + entity.py + __init__.py (DataUpdateCoordinator, runtime_data, async_setup_entry, first_refresh)
-- [ ] 01-03: config_flow.py (UI config + YAML step) + binary_sensor platform for first router entity + README skeleton
-- [ ] 01-04: Unit tests (TraefikApiClient parsing + error paths), fixture capture, hassfest validation in CI
+- [x] 01-01: Project scaffold (manifest.json, hacs.json, const.py, brand/, pyproject.toml, .gitignore, LICENSE, ruff config)
+- [x] 01-02: api.py + coordinator.py + entity.py + __init__.py (DataUpdateCoordinator, runtime_data, async_setup_entry, first_refresh)
+- [x] 01-03: config_flow.py (UI config + YAML step) + binary_sensor platform for first router entity + README skeleton
+- [x] 01-04: Unit tests (TraefikApiClient parsing + error paths), fixture capture, hassfest validation in CI
 
 ### Phase 2: Core Entities + Options + Reauth + Reload
 **Goal**: Users can configure integration options without re-adding the entry,
@@ -205,7 +205,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 4/4 | Complete   | 2026-07-05 |
 | 2. Core Entities + Options + Reauth + Reload | 0/TBD | Not started | - |
 | 3. TLS Certificate Expiry | 0/TBD | Not started | - |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
