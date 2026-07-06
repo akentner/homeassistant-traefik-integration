@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.helpers import entity_registry as er
@@ -61,39 +61,15 @@ async def async_setup_entry(
     services = filter_internal_items(_list_or_empty(data.get("http_services")))
     service_entities = [TraefikServiceSensor(entry, coordinator, svc) for svc in services]
 
-    # Three aggregate sensors (CONTEXT.md D-17). Counts derive from the
-    # *filtered* lists (so `@<provider>` internals never inflate the totals)
-    # while TCP/UDP breakdowns come from `/api/overview` for visibility.
-    overview = _dict_or_empty(data.get("overview"))
-    http_overview = _dict_or_empty(overview.get("http"))
-    tcp_overview = _dict_or_empty(overview.get("tcp"))
-    udp_overview = _dict_or_empty(overview.get("udp"))
-
-    routers_filtered = filter_internal_items(_list_or_empty(data.get("http_routers")))
-    middlewares_filtered = filter_internal_items(_list_or_empty(data.get("http_middlewares")))
-
+    # Aggregate counters on the Overview device (CONTEXT.md D-17). The
+    # sensors compute their state and breakdown attributes lazily from
+    # ``coordinator.data`` on every property access (see
+    # ``_TraefikAggregateCountSensor`` docstring for the v0.1.4 fix) —
+    # no per-construction count kwargs needed.
     aggregate_entities = [
-        TraefikRoutersCountSensor(
-            entry,
-            coordinator,
-            filtered_count=len(routers_filtered),
-            http_count=_safe_int(http_overview.get("routers")),
-            tcp_count=_safe_int(tcp_overview.get("routers")),
-            udp_count=_safe_int(udp_overview.get("routers")),
-        ),
-        TraefikServicesCountSensor(
-            entry,
-            coordinator,
-            filtered_count=len(services),
-            http_count=_safe_int(http_overview.get("services")),
-            tcp_count=_safe_int(tcp_overview.get("services")),
-            udp_count=_safe_int(udp_overview.get("services")),
-        ),
-        TraefikMiddlewaresCountSensor(
-            entry,
-            coordinator,
-            filtered_count=len(middlewares_filtered),
-        ),
+        TraefikRoutersCountSensor(entry),
+        TraefikServicesCountSensor(entry),
+        TraefikMiddlewaresCountSensor(entry),
     ]
 
     async_add_entities(entrypoint_entities + service_entities + aggregate_entities)
@@ -381,41 +357,84 @@ class TraefikServiceSensor(TraefikEntity, SensorEntity):
 class _TraefikAggregateCountSensor(TraefikEntity, SensorEntity):
     """Shared base for the three Overview device aggregate counters.
 
-    Each instance reports a ``filtered_count`` (the primary state — what
-    the user actually sees) plus a breakdown across HTTP/TCP/UDP from
-    ``/api/overview`` for visibility (CONTEXT.md D-17 + UX-04).
+    State and breakdown attributes are **properties** that recompute from
+    ``coordinator.data`` on every access. Coordinator refreshes fire
+    ``async_write_ha_state`` which causes HA to re-read these properties,
+    so the displayed value reflects Traefik's current roster — not
+    whatever the first fetch happened to return.
+
+    v0.1.4 fix: the previous implementation captured ``filtered_count``
+    in ``self._attr_native_value`` at ``__init__`` time and never updated
+    it. After the very first coordinator cycle, the value froze — counts
+    of the freshly-bootstrapped Traefik with empty router lists would
+    read "0" forever even after routers were configured.
 
     ``state_class=MEASUREMENT`` so HA can graph trends over time — users
     may want to chart how many routers / services / middlewares are
     configured across deploys.
+
+    Subclasses override:
+
+    - ``_DATA_KEY`` — coordinator.data key to count and filter
+      (e.g. ``"http_routers"``)
+    - ``_OVERVIEW_KEY`` — sub-key under each ``/api/overview`` transport
+      block (e.g. ``"routers"`` for routers / services, ``None`` for
+      middlewares which have no transport breakdown).
+    - ``_HAS_OVERVIEW_BREAKDOWN`` — ``False`` for middlewares.
     """
 
     _attr_state_class = SensorStateClass.MEASUREMENT
 
+    _DATA_KEY: ClassVar[str]
+    _OVERVIEW_KEY: ClassVar[str]
+    _HAS_OVERVIEW_BREAKDOWN: ClassVar[bool] = True
+
     def __init__(
         self,
         entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
         *,
-        description_key: str,
-        filtered_count: int,
         unique_id: str,
         entity_id: str,
         name: str,
     ) -> None:
-        super().__init__(entry, category="overview", description_key=description_key)
+        super().__init__(entry, category="overview", description_key=unique_id)
         self._attr_unique_id = unique_id
         self.entity_id = entity_id
         self._attr_name = name
-        # Computed once at setup; the value does not change inside the
-        # constructor. Updates flow via ``async_add_entities`` re-instantiation
-        # when the platform reloads (the platform currently doesn't, but the
-        # count is recomputed every setup cycle).
-        self._attr_native_value = int(filtered_count)
 
     @property
     def available(self) -> bool:
         return self.coordinator.last_update_success
+
+    @property
+    def native_value(self) -> int:
+        """Filtered count of ``_DATA_KEY`` from the most recent coordinator data.
+
+        Returns 0 on cold start (``coordinator.data`` is None) or when
+        the key is missing from the response.
+        """
+        data = self.coordinator.data
+        if not isinstance(data, dict):
+            return 0
+        return len(filter_internal_items(_list_or_empty(data.get(self._DATA_KEY))))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Breakdown counts per transport (HTTP / TCP / UDP) from ``/api/overview``.
+
+        Empty breakdown (``_HAS_OVERVIEW_BREAKDOWN = False``) returns
+        just ``{"filtered_count": ...}`` — middlewares are HTTP-only per
+        Traefik's API surface.
+        """
+        attrs: dict[str, Any] = {"filtered_count": self.native_value}
+        if not self._HAS_OVERVIEW_BREAKDOWN:
+            return attrs
+        data = self.coordinator.data
+        overview = _dict_or_empty(data.get("overview")) if isinstance(data, dict) else {}
+        attrs["http_count"] = _safe_int(_dict_or_empty(overview.get("http")).get(self._OVERVIEW_KEY))
+        attrs["tcp_count"] = _safe_int(_dict_or_empty(overview.get("tcp")).get(self._OVERVIEW_KEY))
+        attrs["udp_count"] = _safe_int(_dict_or_empty(overview.get("udp")).get(self._OVERVIEW_KEY))
+        return attrs
 
 
 class TraefikRoutersCountSensor(_TraefikAggregateCountSensor):
@@ -425,73 +444,31 @@ class TraefikRoutersCountSensor(_TraefikAggregateCountSensor):
     attributes break down by transport (HTTP / TCP / UDP) from ``/api/overview``.
     """
 
-    def __init__(
-        self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
-        *,
-        filtered_count: int,
-        http_count: int = 0,
-        tcp_count: int = 0,
-        udp_count: int = 0,
-    ) -> None:
+    _DATA_KEY = "http_routers"
+    _OVERVIEW_KEY = "routers"
+
+    def __init__(self, entry: TraefikConfigEntry) -> None:
         super().__init__(
             entry,
-            coordinator,
-            description_key="routers_count",
-            filtered_count=filtered_count,
             unique_id=f"{entry.entry_id}_overview_routers_count",
             entity_id="sensor.traefik_routers",
             name="Routers",
         )
-        self._http_count = http_count
-        self._tcp_count = tcp_count
-        self._udp_count = udp_count
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {
-            "filtered_count": self._attr_native_value,
-            "http_count": self._http_count,
-            "tcp_count": self._tcp_count,
-            "udp_count": self._udp_count,
-        }
 
 
 class TraefikServicesCountSensor(_TraefikAggregateCountSensor):
     """Total Traefik services — filtered count (CONTEXT.md D-17)."""
 
-    def __init__(
-        self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
-        *,
-        filtered_count: int,
-        http_count: int = 0,
-        tcp_count: int = 0,
-        udp_count: int = 0,
-    ) -> None:
+    _DATA_KEY = "http_services"
+    _OVERVIEW_KEY = "services"
+
+    def __init__(self, entry: TraefikConfigEntry) -> None:
         super().__init__(
             entry,
-            coordinator,
-            description_key="services_count",
-            filtered_count=filtered_count,
             unique_id=f"{entry.entry_id}_overview_services_count",
             entity_id="sensor.traefik_services",
             name="Services",
         )
-        self._http_count = http_count
-        self._tcp_count = tcp_count
-        self._udp_count = udp_count
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {
-            "filtered_count": self._attr_native_value,
-            "http_count": self._http_count,
-            "tcp_count": self._tcp_count,
-            "udp_count": self._udp_count,
-        }
 
 
 class TraefikMiddlewaresCountSensor(_TraefikAggregateCountSensor):
@@ -501,26 +478,17 @@ class TraefikMiddlewaresCountSensor(_TraefikAggregateCountSensor):
     middleware concept), so the breakdown is just the filtered count.
     """
 
-    def __init__(
-        self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
-        *,
-        filtered_count: int,
-    ) -> None:
+    _DATA_KEY = "http_middlewares"
+    _OVERVIEW_KEY = ""  # unused — overridden by _HAS_OVERVIEW_BREAKDOWN = False
+    _HAS_OVERVIEW_BREAKDOWN = False
+
+    def __init__(self, entry: TraefikConfigEntry) -> None:
         super().__init__(
             entry,
-            coordinator,
-            description_key="middlewares_count",
-            filtered_count=filtered_count,
             unique_id=f"{entry.entry_id}_overview_middlewares_count",
             entity_id="sensor.traefik_middlewares",
             name="Middlewares",
         )
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {"filtered_count": self._attr_native_value}
 
 
 class TraefikCertTimestampSensor(TraefikEntity, SensorEntity):

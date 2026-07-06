@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 from homeassistant.util import slugify
 
-from custom_components.traefik.api import filter_internal_items
 from custom_components.traefik.sensor import (
     TraefikEntrypointSensor,
     TraefikMiddlewaresCountSensor,
@@ -25,19 +24,40 @@ from custom_components.traefik.sensor import (
 
 
 def _entry(name: str = "traefik.example.com") -> MagicMock:
-    """Build a mock TraefikConfigEntry for sensor instantiation."""
+    """Build a mock TraefikConfigEntry for sensor instantiation.
+
+    Note: ``runtime_data`` is left unset — for sensors that read state
+    from the coordinator, use :func:`_entry_with_data` instead which
+    wires the coordinator into ``entry.runtime_data`` so that
+    ``TraefikEntity.__init__`` resolves ``self.coordinator`` to the
+    data-bearing mock.
+    """
     e = MagicMock()
     e.entry_id = "test-entry"
     e.data = {"url": f"https://{name}:8080"}
     return e
 
 
-def _coordinator_with(data: dict[str, Any]) -> MagicMock:
+def _coordinator_with(data: dict[str, Any] | None) -> MagicMock:
     """Build a MagicMock coordinator with the given data payload."""
     coord = MagicMock()
     coord.data = data
     coord.last_update_success = True
     return coord
+
+
+def _entry_with_data(data: dict[str, Any] | None) -> tuple[MagicMock, MagicMock]:
+    """Build a (entry, coordinator) pair wired together for entity tests.
+
+    The entry's ``runtime_data`` slot holds the coordinator so
+    ``TraefikEntity.__init__`` resolves ``self.coordinator`` to the mock
+    that owns the data dict. Required for the v0.1.4+ property-based
+    state derivation on the aggregate count sensors.
+    """
+    entry = _entry()
+    coord = _coordinator_with(data)
+    entry.runtime_data = coord
+    return entry, coord
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +154,7 @@ def test_service_sensor_attributes_include_servers_and_count() -> None:
 
 def test_routers_count_sensor_uses_filtered_count() -> None:
     """Routers count drops @<provider> internal items."""
-    coord = _coordinator_with(
+    entry, _coord = _entry_with_data(
         {
             "http_routers": [
                 {"name": "user-router"},
@@ -142,15 +162,18 @@ def test_routers_count_sensor_uses_filtered_count() -> None:
             ],
         }
     )
-    filtered = filter_internal_items(coord.data["http_routers"])
-    entity = TraefikRoutersCountSensor(_entry(), coord, filtered_count=len(filtered))
-    assert entity.native_value == 1
+    entity = TraefikRoutersCountSensor(entry)
+    assert entity.native_value == 1  # api@internal filtered out
 
 
 def test_aggregate_sensor_attributes_include_breakdown() -> None:
-    """extra_state_attributes include http_count/tcp_count/udp_count from overview."""
-    coord = _coordinator_with(
+    """extra_state_attributes read http_count/tcp_count/udp_count from /api/overview."""
+    entry, _coord = _entry_with_data(
         {
+            "http_routers": [
+                {"name": "r1"},
+                {"name": "r2"},
+            ],
             "overview": {
                 "http": {"routers": 3},
                 "tcp": {"routers": 1},
@@ -158,24 +181,67 @@ def test_aggregate_sensor_attributes_include_breakdown() -> None:
             },
         }
     )
-    entity = TraefikRoutersCountSensor(
-        _entry(),
-        coord,
-        filtered_count=2,
-        http_count=3,
-        tcp_count=1,
-        udp_count=0,
-    )
+    entity = TraefikRoutersCountSensor(entry)
     attrs = entity.extra_state_attributes
+    assert attrs["filtered_count"] == 2
     assert attrs["http_count"] == 3
     assert attrs["tcp_count"] == 1
     assert attrs["udp_count"] == 0
-    assert attrs["filtered_count"] == 2
+
+
+def test_aggregate_count_updates_on_coordinator_cycle() -> None:
+    """v0.1.4 regression: counts MUST refresh on every coordinator cycle.
+
+    The pre-v0.1.4 implementation captured ``filtered_count`` at __init__
+    time in ``self._attr_native_value`` and never updated it. Counts of a
+    freshly-bootstrapped Traefik with empty router lists read "0" forever
+    even after routers were configured.
+
+    The new implementation reads from ``coordinator.data`` on every
+    property access; this test mutates ``coord.data`` between two reads
+    to assert that the count tracks the current data, not the initial.
+    """
+    entry, _coord = _entry_with_data({"http_routers": []})
+    entity = TraefikRoutersCountSensor(entry)
+    assert entity.native_value == 0
+
+    # Coordinator refresh brings new data
+    entry.runtime_data.data = {"http_routers": [{"name": "new"}, {"name": "another"}]}
+    assert entity.native_value == 2  # updated without re-instantiation
+
+
+def test_aggregate_attributes_refresh_with_coordinator_data() -> None:
+    """v0.1.4 regression: overview breakdown attributes also refresh."""
+    entry, _coord = _entry_with_data(
+        {
+            "http_routers": [],
+            "overview": {"http": {"routers": 0}},
+        }
+    )
+    entity = TraefikRoutersCountSensor(entry)
+    assert entity.extra_state_attributes["http_count"] == 0
+
+    entry.runtime_data.data = {
+        "http_routers": [{"name": "a"}],
+        "overview": {"http": {"routers": 1}},
+    }
+    assert entity.extra_state_attributes["filtered_count"] == 1
+    assert entity.extra_state_attributes["http_count"] == 1
+
+
+def test_aggregate_returns_zero_when_coordinator_data_missing() -> None:
+    """Cold-start case (coordinator.data is None): all counts 0, breakdown 0."""
+    entry, _coord = _entry_with_data(None)
+    entry.runtime_data.last_update_success = False
+    entity = TraefikRoutersCountSensor(entry)
+    assert entity.native_value == 0
+    assert entity.extra_state_attributes["filtered_count"] == 0
+    assert entity.extra_state_attributes["http_count"] == 0
 
 
 def test_services_count_sensor_uses_filtered_count() -> None:
     """Services count drops @<provider> internal items (api@internal)."""
-    coord = _coordinator_with(
+    entry, _coord = _entry_with_data(
         {
             "http_services": [
                 {"name": "backend-api"},
@@ -184,14 +250,16 @@ def test_services_count_sensor_uses_filtered_count() -> None:
             ],
         }
     )
-    filtered = filter_internal_items(coord.data["http_services"])
-    entity = TraefikServicesCountSensor(_entry(), coord, filtered_count=len(filtered))
+    entity = TraefikServicesCountSensor(entry)
     assert entity.native_value == 2
 
 
 def test_middlewares_count_sensor_uses_filtered_count() -> None:
-    """Middlewares count drops @<provider> internal items (strip@docker)."""
-    coord = _coordinator_with(
+    """Middlewares count drops @<provider> internal items (strip@docker).
+
+    Middlewares are HTTP-only — no http_count/tcp_count/udp breakdown.
+    """
+    entry, _coord = _entry_with_data(
         {
             "http_middlewares": [
                 {"name": "auth-headers"},
@@ -200,6 +268,28 @@ def test_middlewares_count_sensor_uses_filtered_count() -> None:
             ],
         }
     )
-    filtered = filter_internal_items(coord.data["http_middlewares"])
-    entity = TraefikMiddlewaresCountSensor(_entry(), coord, filtered_count=len(filtered))
+    entity = TraefikMiddlewaresCountSensor(entry)
     assert entity.native_value == 2
+    assert entity.extra_state_attributes == {"filtered_count": 2}
+
+
+def test_middlewares_no_overview_breakdown() -> None:
+    """TraefikMiddlewaresCountSensor excludes http/tcp/udp breakdown attrs.
+
+    Middlewares are HTTP-only per Traefik's API surface — there is no
+    TCP/UDP middleware concept, so the breakdown is meaningless. The
+    base class' ``_HAS_OVERVIEW_BREAKDOWN = False`` flag suppresses those
+    keys entirely.
+    """
+    entry, _coord = _entry_with_data(
+        {
+            "http_middlewares": [{"name": "x"}],
+            "overview": {"http": {"middlewares": 5}, "tcp": {"middlewares": 99}},
+        }
+    )
+    entity = TraefikMiddlewaresCountSensor(entry)
+    attrs = entity.extra_state_attributes
+    assert attrs == {"filtered_count": 1}
+    assert "http_count" not in attrs
+    assert "tcp_count" not in attrs
+    assert "udp_count" not in attrs
