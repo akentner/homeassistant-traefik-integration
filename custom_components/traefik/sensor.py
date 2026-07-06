@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, cast
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.helpers import entity_registry as er
@@ -239,6 +239,52 @@ def _safe_int(value: Any) -> int:
     return 0
 
 
+# Map Traefik's API `status` strings onto the dashboard buckets used in
+# ``custom:modern-circular-gauge`` cards. Traefik v3 returns
+# ``enabled | disabled | warning | error``; we surface those as
+# ``success | disabled | warning | error`` (matching Traefik's dashboard
+# pie-chart slice labels). Items whose status is missing or unmapped are
+# silently skipped — they don't show up in any bucket (avoids polluting
+# the count when Traefik adds a new status class in a future version).
+_STATUS_TO_BUCKET: Final[dict[str, str]] = {
+    "enabled": "success",
+    "warning": "warning",
+    "error": "error",
+    "disabled": "disabled",
+}
+
+
+def _count_by_status(
+    items: list[dict[str, Any]],
+    *,
+    name_key: str = "name",
+    status_key: str = "status",
+) -> dict[str, int]:
+    """Count ``items`` grouped by their ``status_key`` mapped to bucket labels.
+
+    Items missing ``status_key`` or with an unmapped status value are
+    silently dropped (no bucket for them). Items that aren't dicts are
+    also dropped. The caller is responsible for ``filter_internal_items``
+    BEFORE this helper — we count whatever we receive.
+
+    :return: ``{"success": N, "warning": N, "error": N, "disabled": N}``
+        with all four keys always present (zero when no matches).
+    """
+    counts: dict[str, int] = {
+        "success": 0,
+        "warning": 0,
+        "error": 0,
+        "disabled": 0,
+    }
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        bucket = _STATUS_TO_BUCKET.get(str(item.get(status_key, "")), None)
+        if bucket is not None:
+            counts[bucket] += 1
+    return counts
+
+
 class TraefikEntrypointSensor(TraefikEntity, SensorEntity):
     """One sensor per Traefik HTTP entrypoint (CONTEXT.md D-15).
 
@@ -425,11 +471,34 @@ class _TraefikAggregateCountSensor(TraefikEntity, SensorEntity):
         Empty breakdown (``_HAS_OVERVIEW_BREAKDOWN = False``) returns
         just ``{"filtered_count": ...}`` — middlewares are HTTP-only per
         Traefik's API surface.
+
+        v0.2.0 additions: per-bucket counts (success / warning / error /
+        disabled) and a derived ``success_pct`` for dashboard pies /
+        gauges. Reads from ``coordinator.data`` on every call so the
+        counts refresh on each coordinator cycle (same pattern as
+        ``native_value`` — see v0.1.4 fix).
         """
         attrs: dict[str, Any] = {"filtered_count": self.native_value}
+        # Status breakdown (success/warning/error/disabled) — applied to
+        # both routers+services (which have _HAS_OVERVIEW_BREAKDOWN=True)
+        # and middlewares (False). The breakdown reads the per-item status
+        # directly from /api/http/{routers,services,middlewares}, which is
+        # independent of the /api/overview breakdown above.
+        data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
+        items = filter_internal_items(_list_or_empty(data.get(self._DATA_KEY)))
+        breakdown = _count_by_status(items)
+        attrs.update({f"{bucket}_count": count for bucket, count in breakdown.items()})
+        attrs["status_breakdown"] = breakdown
+        # success_pct = success / (success + warning + error). Excludes
+        # disabled (admin has explicitly turned it off — not a quality
+        # signal). Clamped to [0.0, 100.0]. 100.0 if no non-disabled items
+        # at all.
+        non_disabled = breakdown["success"] + breakdown["warning"] + breakdown["error"]
+        pct = breakdown["success"] / non_disabled * 100.0 if non_disabled > 0 else 100.0
+        attrs["success_pct"] = max(0.0, min(100.0, pct))
+
         if not self._HAS_OVERVIEW_BREAKDOWN:
             return attrs
-        data = self.coordinator.data
         overview = _dict_or_empty(data.get("overview")) if isinstance(data, dict) else {}
         attrs["http_count"] = _safe_int(_dict_or_empty(overview.get("http")).get(self._OVERVIEW_KEY))
         attrs["tcp_count"] = _safe_int(_dict_or_empty(overview.get("tcp")).get(self._OVERVIEW_KEY))

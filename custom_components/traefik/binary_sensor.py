@@ -43,11 +43,16 @@ async def async_setup_entry(
     """Set up Traefik binary sensors for a config entry.
 
     Creates one ``TraefikRouterBinarySensor`` per user-visible Traefik HTTP
-    router (CONTEXT.md D-06 / Phase 1 ROUTER-01) PLUS one
-    ``TraefikAnyRouterFailingBinarySensor`` aggregate on the Diagnostics
-    device (CONTEXT.md D-14/D-19). The aggregate is a single instance per
-    config entry — never deleted; if all routers disappear the sensor falls
-    to OFF (no routers failing) and stays.
+    router (CONTEXT.md D-06 / Phase 1 ROUTER-01) PLUS three aggregate
+    binary sensors on the Diagnostics device (CONTEXT.md D-14/D-19):
+
+    - ``TraefikAnyRouterFailingBinarySensor``
+    - ``TraefikAnyServiceFailingBinarySensor`` (v0.2.0)
+    - ``TraefikAnyMiddlewareFailingBinarySensor`` (v0.2.0)
+
+    All aggregates are single instance per config entry — never deleted;
+    if the relevant list disappears the sensor falls to OFF (no items
+    failing) and stays.
     """
     coordinator: TraefikCoordinator = entry.runtime_data
 
@@ -57,7 +62,20 @@ async def async_setup_entry(
     routers = filter_internal_items(coordinator.data.get("http_routers") or [])
     router_entities = [TraefikRouterBinarySensor(entry, coordinator, router) for router in routers]
     any_failing_entity = TraefikAnyRouterFailingBinarySensor(entry, coordinator)
-    async_add_entities([*router_entities, any_failing_entity])
+    # v0.2.0: parallel aggregates for services + middlewares so users get
+    # the same any-X-failing alarm pattern across all three Traefik
+    # categories. Single-instance (D-19), PROBLEM device_class, opt-in
+    # (entity_registry_enabled_default=False, PITFALLS M-12).
+    any_service_failing_entity = TraefikAnyServiceFailingBinarySensor(entry, coordinator)
+    any_middleware_failing_entity = TraefikAnyMiddlewareFailingBinarySensor(entry, coordinator)
+    async_add_entities(
+        [
+            *router_entities,
+            any_failing_entity,
+            any_service_failing_entity,
+            any_middleware_failing_entity,
+        ]
+    )
 
     # Stale entity cleanup (CONTEXT.md D-18, gatus binary_sensor.py:49-71).
     # Routers that disappear from coordinator.data are removed from the
@@ -243,7 +261,7 @@ class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
     Reads the raw ``http_routers`` list (NOT ``filter_internal_items``-ed)
     so a failing Traefik-internal router like ``api@internal`` can also
     surface the alarm — internal routers are filtered from per-router
-    entities (entity-id regex rejects ``@``) but the aggregate is
+    entities (entity-id regex rejects ``@`) but the aggregate is
     internally a normal HA entity and can hold any name.
     """
 
@@ -284,6 +302,109 @@ class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
         return {
             "failing_router_count": len(failing),
             "failing_router_names": [r.get("name") for r in failing if isinstance(r, dict)],
+        }
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+
+class TraefikAnyServiceFailingBinarySensor(TraefikEntity, BinarySensorEntity):
+    """Aggregates HTTP service health: ON when ANY service status != 'enabled'.
+
+    v0.2.0 mirror of ``TraefikAnyRouterFailingBinarySensor`` for services.
+    Same PROBLEM device_class + ``entity_registry_enabled_default=False``
+    pattern (PITFALLS M-12 + CONTEXT.md D-19). Reads the raw
+    ``http_services`` list — Traefik-internal services like
+    ``api@internal`` are NOT excluded here (a failing internal service
+    is still operationally relevant even though it isn't surfaced as a
+    per-service entity).
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        entry: TraefikConfigEntry,
+        coordinator: TraefikCoordinator,
+    ) -> None:
+        super().__init__(entry, category="diagnostics", description_key="any_service_failing")
+        self._attr_unique_id = f"{entry.entry_id}_diagnostics_any_service_failing"
+        self.entity_id = "binary_sensor.traefik_any_service_failing"
+        self._attr_name = "Any service failing"
+
+    @property
+    def is_on(self) -> bool | None:
+        data = self.coordinator.data
+        if not isinstance(data, dict):
+            return None
+        services = data.get("http_services")
+        if not isinstance(services, list):
+            return None
+        failing = [s for s in services if isinstance(s, dict) and s.get("status") != "enabled"]
+        return bool(failing)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self.coordinator.data
+        services = data.get("http_services") if isinstance(data, dict) else None
+        if not isinstance(services, list):
+            return {"failing_service_count": 0, "failing_service_names": []}
+        failing = [s for s in services if isinstance(s, dict) and s.get("status") != "enabled"]
+        return {
+            "failing_service_count": len(failing),
+            "failing_service_names": [s.get("name") for s in failing if isinstance(s, dict)],
+        }
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+
+class TraefikAnyMiddlewareFailingBinarySensor(TraefikEntity, BinarySensorEntity):
+    """Aggregates HTTP middleware health: ON when ANY middleware status != 'enabled'.
+
+    v0.2.0 mirror of ``TraefikAnyRouterFailingBinarySensor`` for
+    middlewares. Middlewares are HTTP-only per Traefik's API surface, but
+    they still report a ``status`` field (enabled / disabled / warning /
+    error) that we aggregate here.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        entry: TraefikConfigEntry,
+        coordinator: TraefikCoordinator,
+    ) -> None:
+        super().__init__(entry, category="diagnostics", description_key="any_middleware_failing")
+        self._attr_unique_id = f"{entry.entry_id}_diagnostics_any_middleware_failing"
+        self.entity_id = "binary_sensor.traefik_any_middleware_failing"
+        self._attr_name = "Any middleware failing"
+
+    @property
+    def is_on(self) -> bool | None:
+        data = self.coordinator.data
+        if not isinstance(data, dict):
+            return None
+        middlewares = data.get("http_middlewares")
+        if not isinstance(middlewares, list):
+            return None
+        failing = [m for m in middlewares if isinstance(m, dict) and m.get("status") != "enabled"]
+        return bool(failing)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self.coordinator.data
+        middlewares = data.get("http_middlewares") if isinstance(data, dict) else None
+        if not isinstance(middlewares, list):
+            return {"failing_middleware_count": 0, "failing_middleware_names": []}
+        failing = [m for m in middlewares if isinstance(m, dict) and m.get("status") != "enabled"]
+        return {
+            "failing_middleware_count": len(failing),
+            "failing_middleware_names": [m.get("name") for m in failing if isinstance(m, dict)],
         }
 
     @property

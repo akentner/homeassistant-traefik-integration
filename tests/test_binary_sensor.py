@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.util import slugify
 
 from custom_components.traefik.api import filter_internal_items
-from custom_components.traefik.binary_sensor import TraefikRouterBinarySensor
+from custom_components.traefik.binary_sensor import (
+    TraefikAnyMiddlewareFailingBinarySensor,
+    TraefikAnyServiceFailingBinarySensor,
+    TraefikRouterBinarySensor,
+)
 
 
 def _router(name: str, status: str) -> dict:
@@ -200,3 +205,115 @@ def test_device_info_uses_per_category_identifier():
     assert info["manufacturer"] == "Traefik"
     assert info["sw_version"] == "3.1.4"
     assert "HTTP Routers" in info["name"]
+
+
+# ---------------------------------------------------------------------------
+# v0.2.0 — TraefikAnyServiceFailingBinarySensor + TraefikAnyMiddlewareFailingBinarySensor
+# ---------------------------------------------------------------------------
+
+
+def _entry_with_data(data: Any) -> MagicMock:
+    """Helper: build a MagicMock entry with the given coordinator data.
+
+    Mirrors ``_entry_with_data`` in test_sensor.py — wiring the coordinator
+    into ``entry.runtime_data`` so ``TraefikEntity.__init__`` resolves
+    ``self.coordinator`` to the data-bearing mock.
+    """
+    coord = MagicMock()
+    coord.data = data
+    coord.last_update_success = True
+    entry = MagicMock()
+    entry.entry_id = "test-entry"
+    entry.data = {"url": "https://traefik.example.com:8080"}
+    entry.runtime_data = coord
+    return entry
+
+
+def test_any_service_failing_aggregates_status() -> None:
+    """TraefikAnyServiceFailingBinarySensor.is_on is True when any service != enabled."""
+    entry = _entry_with_data(
+        {
+            "http_services": [
+                {"name": "ok", "status": "enabled"},
+                {"name": "broken", "status": "error"},
+            ],
+        }
+    )
+    entity = TraefikAnyServiceFailingBinarySensor(entry, entry.runtime_data)
+    assert entity.is_on is True
+    attrs = entity.extra_state_attributes
+    assert attrs["failing_service_count"] == 1
+    assert attrs["failing_service_names"] == ["broken"]
+
+
+def test_any_service_failing_disabled_when_all_enabled() -> None:
+    """All-enabled services → is_on=False, count=0, names=[]."""
+    entry = _entry_with_data(
+        {
+            "http_services": [
+                {"name": "ok-1", "status": "enabled"},
+                {"name": "ok-2", "status": "enabled"},
+            ],
+        }
+    )
+    entity = TraefikAnyServiceFailingBinarySensor(entry, entry.runtime_data)
+    assert entity.is_on is False
+    assert entity.extra_state_attributes["failing_service_count"] == 0
+    assert entity.extra_state_attributes["failing_service_names"] == []
+
+
+def test_any_middleware_failing_aggregates_status() -> None:
+    """TraefikAnyMiddlewareFailingBinarySensor mirrors the service variant for middlewares."""
+    entry = _entry_with_data(
+        {
+            "http_middlewares": [
+                {"name": "auth", "status": "enabled"},
+                {"name": "rate-limit", "status": "warning"},
+                {"name": "strip@docker", "status": "enabled"},
+                # Disabled counts as failing (consistent with the router aggregate).
+                {"name": "off-mw", "status": "disabled"},
+            ],
+        }
+    )
+    entity = TraefikAnyMiddlewareFailingBinarySensor(entry, entry.runtime_data)
+    assert entity.is_on is True
+    attrs = entity.extra_state_attributes
+    assert attrs["failing_middleware_count"] == 2
+    assert set(attrs["failing_middleware_names"]) == {"rate-limit", "off-mw"}
+
+
+def test_any_failing_handles_missing_data() -> None:
+    """Cold start: coordinator.data is None → is_on=None, attributes empty."""
+    entry = _entry_with_data(None)
+    entry.runtime_data.last_update_success = False
+    for cls in (
+        TraefikAnyServiceFailingBinarySensor,
+        TraefikAnyMiddlewareFailingBinarySensor,
+    ):
+        entity = cls(entry, entry.runtime_data)
+        assert entity.is_on is None
+        # attributes always return a safe default
+        attrs = entity.extra_state_attributes
+        assert attrs[next(k for k in attrs if k.startswith("failing_") and k.endswith("_count"))] == 0
+
+
+def test_any_failing_disabled_by_default() -> None:
+    """PITFALLS M-12: PROBLEM aggregates are entity_registry_enabled_default=False.
+
+    Both ``TraefikAnyServiceFailingBinarySensor`` and
+    ``TraefikAnyMiddlewareFailingBinarySensor`` follow the same opt-in
+    pattern as the router variant — they don't pollute the States panel
+    by default.
+
+    Note: HA's ``CachedProperties`` metaclass moves class-level
+    ``_attr_*`` attrs to ``__attr_*`` private names and wraps them in a
+    property; the public class-level read returns the property
+    descriptor, not the underlying value. We read the raw value out of
+    ``cls.__dict__`` (same pattern as
+    ``test_binary_sensor_tls_expiring.py::test_cert_expiry_disabled_by_default``).
+    """
+    for cls in (
+        TraefikAnyServiceFailingBinarySensor,
+        TraefikAnyMiddlewareFailingBinarySensor,
+    ):
+        assert cls.__dict__.get("__attr_entity_registry_enabled_default") is False
