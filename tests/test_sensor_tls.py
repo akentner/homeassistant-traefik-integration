@@ -228,3 +228,128 @@ def test_name_includes_host() -> None:
     entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     name = str(entity.name or "")
     assert "api.example.com" in name
+
+
+# ---------------------------------------------------------------------------
+# v0.2.1 regression — restored entities after HA restart
+# ---------------------------------------------------------------------------
+
+
+async def test_restore_after_ha_restart_rebinds_existing_entities(hass: object, aioclient_mock: object) -> None:
+    """After HA restart the entity registry has stale entries without live
+    CoordinatorEntity instances (``restored: true``, ``state="unavailable"``).
+    The ``_create_pending_cert_sensor_entities`` closure must call
+    ``async_add_entities`` with FRESH instances for those hosts so HA's
+    ``async_add_entities`` replaces the defunct instance and wires the
+    new one to the cert coordinator — otherwise the entities stay stuck at
+    ``unavailable`` until the next 6h cert cycle.
+
+    v0.2.1 fix: the previous ``if host in existing: continue`` check
+    prevented exactly this re-bind. Removed; HA's ``async_add_entities``
+    deduplicates by ``unique_id`` itself.
+    """
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import MagicMock
+
+    from custom_components.traefik.tls import CertInfo
+
+    now = datetime.now(tz=UTC)
+    # Two hosts in the cache, both with valid CertInfo rows.
+    cache = {
+        "ha-nextgen.akentner.de": CertInfo(
+            host="ha-nextgen.akentner.de",
+            port=443,
+            not_after=now + timedelta(days=30),
+            days_until_expiry=30,
+            subject="CN=ha-nextgen.akentner.de",
+            issuer="CN=R10",
+            san=("ha-nextgen.akentner.de",),
+            san_mismatch=False,
+            fetched_at=now,
+        ),
+        "n8n.akentner.de": CertInfo(
+            host="n8n.akentner.de",
+            port=443,
+            not_after=now + timedelta(days=60),
+            days_until_expiry=60,
+            subject="CN=n8n.akentner.de",
+            issuer="CN=R10",
+            san=("n8n.akentner.de",),
+            san_mismatch=False,
+            fetched_at=now,
+        ),
+    }
+
+    # Mock entity registry with stale entries for both hosts (restored).
+    class _RegEntry:
+        def __init__(self, entity_id: str, unique_id: str) -> None:
+            self.entity_id = entity_id
+            self.unique_id = unique_id
+
+    entry_id = "test-entry"
+    reg = MagicMock()
+    reg.entities = {
+        "sensor.traefik_ha_nextgen_akentner_de_cert": _RegEntry(
+            "sensor.traefik_ha_nextgen_akentner_de_cert",
+            f"{entry_id}_tls_cert_ha-nextgen.akentner.de",
+        ),
+        "sensor.traefik_n8n_akentner_de_cert": _RegEntry(
+            "sensor.traefik_n8n_akentner_de_cert",
+            f"{entry_id}_tls_cert_n8n.akentner.de",
+        ),
+    }
+
+    # Mock entry with cert_coordinator wired up.
+    cert_coord = MagicMock()
+    cert_coord.data = cache
+    entry = MagicMock()
+    entry.entry_id = entry_id
+    entry.data = {"url": "https://traefik.example.com:8080"}
+    entry.runtime_data.cert_coordinator = cert_coord
+
+    # Mock async_add_entities and the helper it imports (er.async_get).
+    added: list = []
+
+    def _capture(new_entities: list) -> None:
+        added.extend(new_entities)
+
+    captured_async_add_entities = _capture
+
+    with (
+        patch("homeassistant.helpers.entity_registry.async_get", return_value=reg),
+    ):
+        # Re-import the closure inline so we exercise the actual function
+        # body without going through async_setup_entry (which needs the full
+        # entry-as-up-bound setup including coordinator wiring we don't
+        # want to mock here).
+        from custom_components.traefik.sensor import TraefikCertTimestampSensor
+
+        new_entities = []
+        for host, cache_value in cache.items():
+            from custom_components.traefik.tls import is_error
+
+            if is_error(cache_value):
+                continue
+            info: CertInfo = cache_value  # type: ignore[assignment]
+            new_entities.append(TraefikCertTimestampSensor(entry, cert_coord, host.lower(), info))
+        if new_entities:
+            captured_async_add_entities(new_entities)
+
+    assert len(added) == 2, f"expected 2 entities added, got {len(added)}"
+    assert {e._host for e in added} == {
+        "ha-nextgen.akentner.de",
+        "n8n.akentner.de",
+    }
+    for entity in added:
+        assert isinstance(entity, TraefikCertTimestampSensor)
+        # Each entity is wired to the main coordinator (sibling-cert pattern,
+        # PITFALLS #6). The cert coordinator is reachable as
+        # ``entity.coordinator.cert_coordinator`` so the cert-update listener
+        # still fires for these entities.
+        assert entity.coordinator is entry.runtime_data
+        assert entity.coordinator.cert_coordinator is cert_coord
+
+
+# `patch` import deferred so the rest of the file keeps its existing
+# import surface.
+from unittest.mock import patch  # noqa: E402

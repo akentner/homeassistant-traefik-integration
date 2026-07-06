@@ -123,31 +123,27 @@ async def async_setup_entry(
         def _create_pending_cert_binary_sensor_entities() -> None:
             """Materialise one expiring binary sensor per cached cert row.
 
-            BLOCKER #2 fix — entity creation must fire on EVERY cert
-            cycle (not just on initial setup) so hosts discovered after
-            the cold-start empty-cache fallback in plan 03-01 Task 3
-            step 3d(iii) still get their entities registered. Mirrors
-            the timestamp-sensor closure in ``sensor.py`` so the two
+            BLOCKER #2 fix — entity creation must fire on EVERY cert cycle
+            (not just on initial setup) so hosts discovered after the
+            cold-start empty-cache fallback in plan 03-01 Task 3 step
+            3d(iii) still get their entities registered. Mirrors the
+            timestamp-sensor closure in ``sensor.py`` so the two
             platforms stay in sync — when the cert coordinator discovers
             a new host, BOTH the timestamp sensor AND the expiry binary
             sensor register on the same cycle.
+
+            v0.2.1 fix: removed the ``if host in existing: continue`` check.
+            ``async_add_entities`` deduplicates by ``unique_id`` — the
+            check was redundant AND broke the HA-restart restore path
+            (see ``sensor.py`` closure for the full explanation).
             """
             cache = cert_coordinator.data
             if not isinstance(cache, dict) or not cache:
                 return
-            # Skip hosts that already have a registered expiring entity
-            # so repeated cycle ticks are idempotent (no duplicate entities).
-            existing: set[str] = {
-                (reg.unique_id or "").removeprefix(f"{entry.entry_id}_tls_expiring_")
-                for reg in registry.entities.values()
-                if (reg.unique_id or "").startswith(f"{entry.entry_id}_tls_expiring_")
-            }
-            new_entities: list[TraefikCertExpiryBinarySensor] = []
-            for host, cache_value in cache.items():
-                host = host.lower()
-                if host in existing:
-                    continue
-                new_entities.append(TraefikCertExpiryBinarySensor(entry, cert_coordinator, host, cache_value))
+            new_entities: list[TraefikCertExpiryBinarySensor] = [
+                TraefikCertExpiryBinarySensor(entry, cert_coordinator, host.lower(), cache_value)
+                for host, cache_value in cache.items()
+            ]
             if new_entities:
                 async_add_entities(new_entities)
 

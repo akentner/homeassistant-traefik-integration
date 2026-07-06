@@ -94,22 +94,24 @@ async def async_setup_entry(
             call may see an empty cache (zero entities registered — correct)
             and the next 6h cycle will fill the cache and re-trigger this
             closure to add the missing entities.
+
+            v0.2.1 fix: removed the ``if host in existing: continue`` check
+            that skipped already-registered hosts. ``async_add_entities``
+            deduplicates by ``unique_id`` itself — for a registered
+            entity whose live ``CoordinatorEntity`` instance has been
+            garbage-collected (HA restart with restored entities),
+            ``async_add_entities`` REPLACES the defunct instance with
+            the new one and wires it to the coordinator. The redundant
+            check was preventing exactly that re-bind, leaving restored
+            entities stuck at ``state="unavailable"`` + ``restored: true``
+            until the next 6h cert cycle.
             """
             cache = cert_coordinator.data
             if not isinstance(cache, dict) or not cache:
                 return
-            # Skip hosts that already have a registered cert entity so
-            # repeated cycle ticks are idempotent (no duplicate entities).
-            existing: set[str] = {
-                (reg.unique_id or "").removeprefix(f"{entry.entry_id}_tls_cert_")
-                for reg in registry.entities.values()
-                if (reg.unique_id or "").startswith(f"{entry.entry_id}_tls_cert_")
-            }
             new_entities: list[TraefikCertTimestampSensor] = []
             for host, cache_value in cache.items():
                 host = host.lower()
-                if host in existing:
-                    continue
                 # Only timestamp sensors go on ``CertInfo`` rows. Error
                 # hosts get a ``binary_sensor`` only (per D-03 — the
                 # timestamp sensor makes no sense without a ``not_after``).
