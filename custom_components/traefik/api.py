@@ -11,11 +11,24 @@ import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
-# Matches Traefik's `@<provider>` naming convention (CONTEXT.md D-06 / PITFALLS
-# #2). Traefik exposes provider-suffixed items as internal: services like
-# `api@internal`, middlewares like `strip@docker`, routers like `api@internal`.
-# Traefik HA entity-IDs reject `@`, so we drop these before surfacing them.
-_INTERNAL_ITEM_RE = re.compile(r"@\w+")
+# Matches Traefik's auto-generated *internal* items (CONTEXT.md D-06 /
+# PITFALLS #2). Traefik itself exposes built-in API/dashboard/ping/etc.
+# under the literal ``internal`` provider, so the only truly Traefik-internal
+# items carry the suffix ``@internal`` (e.g. ``api@internal``,
+# ``dashboard@internal``, ``web-to-websecure@internal``).
+#
+# The previous regex ``r"@\w+"`` was too aggressive — it also matched
+# provider-suffixed USER items like ``ha-nextgen@file``,
+# ``n8n@docker``, ``strip@docker`` (Traefik's universal naming scheme
+# appends the provider name after every user-defined resource). With the
+# old regex, every user router got dropped from the count and the
+# overview sensors read 0 even when 9 user routers were configured
+# (v0.1.5 bug).
+#
+# Traefik HA entity-IDs can handle ``@`` via ``slugify`` (``@`` → ``_``)
+# so we only need to drop the Traefik-internal ones, not all
+# provider-suffixed items.
+_INTERNAL_ITEM_RE = re.compile(r"@internal$")
 
 
 class TraefikApiError(Exception):
@@ -31,11 +44,15 @@ def filter_internal_items(
     *,
     name_key: str = "name",
 ) -> list[dict[str, Any]]:
-    """Drop Traefik-internal `@<provider>` suffixed items.
+    """Drop Traefik-internal ``@internal`` suffixed items.
 
     Reused by services, middlewares, and routers platforms (CONTEXT.md D-06).
-    A bare trailing `@` with no provider is preserved — Traefik-internal names
-    always carry `<name>@<provider>` where `<provider>` is ``\\w+``.
+    Matches the literal suffix ``@internal`` only (Traefik's auto-generated
+    API / dashboard / ping / redirect items) — does NOT drop provider-
+    suffixed user items like ``ha-nextgen@file`` or ``strip@docker``
+    which are user-named resources that Traefik just suffixes with the
+    provider name. Use ``homeassistant.util.slugify`` to render
+    ``@``-containing names into HA-valid entity IDs.
 
     :param items: list of dicts each with a ``name`` (or ``name_key``) field.
     :param name_key: name of the key whose value carries the item's display

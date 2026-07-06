@@ -22,33 +22,56 @@ def _router(name: str, status: str) -> dict:
 
 
 def test_filter_internal_items_drops_internal():
+    """Traefik's auto-generated ``@internal`` items are dropped; user-named
+    provider-suffixed items (``@docker``, ``@file``, ``@kubernetes``, …)
+    are kept — those are user resources that Traefik just suffixes with
+    the provider name.
+
+    v0.1.5 regression: the previous regex ``r"@\w+"`` matched ANY
+    provider-suffix and dropped user routers. Real-world Traefik setups
+    with file / docker providers all have provider-suffixed user
+    routers (e.g. ``ha-nextgen@file``, ``n8n@docker``) — those are
+    legitimate user items, not Traefik internals.
+    """
     routers = [
-        _router("my-router", "enabled"),
-        _router("api@internal", "enabled"),
-        _router("strip@docker", "enabled"),
-        _router("warn-router", "warning"),
+        _router("my-router", "enabled"),  # kept (no @-suffix)
+        _router("api@internal", "enabled"),  # dropped (Traefik-internal)
+        _router("dashboard@internal", "enabled"),  # dropped (Traefik-internal)
+        _router("strip@docker", "enabled"),  # kept (user-named middleware)
+        _router("ha-nextgen@file", "enabled"),  # kept (user-named router)
+        _router("warn-router", "warning"),  # kept (no @-suffix)
     ]
     filtered = filter_internal_items(routers)
-    assert {r["name"] for r in filtered} == {"my-router", "warn-router"}
+    assert {r["name"] for r in filtered} == {
+        "my-router",
+        "strip@docker",
+        "ha-nextgen@file",
+        "warn-router",
+    }
 
 
 def test_filter_preserves_special_chars_in_user_names():
-    """Only `@<provider>` is the trigger; lone `@` is not enough.
+    """Trailing ``@`` and provider-suffixes that aren't ``internal`` are kept.
 
-    Traefik-internal routers always have the form `<name>@<provider>` where
-    `<provider>` is ``\\w+``. A trailing `@` with no provider is treated as
-    a regular character (the regex requires `@<word>` to match).
-
-    This test pins that exact behavior so future refactors don't widen the
-    filter accidentally.
+    v0.1.5 update: only ``@internal`` is treated as internal. Traefik's
+    universal naming convention appends the provider name to every
+    user-defined resource (so ``strip`` middleware in docker labels
+    becomes ``strip@docker``). Those items are NOT internal; they are
+    user resources that HA should surface.
     """
     routers = [
         _router("router-with-at-edge@", "enabled"),  # trailing @ only -> kept
-        _router("router@feature@v2", "enabled"),  # in the middle with provider -> filtered
+        _router("router@feature@v2", "enabled"),  # in the middle, not @internal -> kept
         _router("plain-router", "enabled"),  # no @ -> kept
+        _router("router@internal-thing", "enabled"),  # @internal followed by hyphen -> kept
     ]
     filtered = filter_internal_items(routers)
-    assert {r["name"] for r in filtered} == {"router-with-at-edge@", "plain-router"}
+    assert {r["name"] for r in filtered} == {
+        "router-with-at-edge@",
+        "router@feature@v2",
+        "plain-router",
+        "router@internal-thing",
+    }
 
 
 @pytest.mark.parametrize(

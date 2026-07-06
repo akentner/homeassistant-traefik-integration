@@ -255,22 +255,26 @@ def test_services_count_sensor_uses_filtered_count() -> None:
 
 
 def test_middlewares_count_sensor_uses_filtered_count() -> None:
-    """Middlewares count drops @<provider> internal items (strip@docker).
+    """Middlewares count drops ``@internal`` items (Traefik's auto-generated
+    API/dashboard/redirect internals).
 
     Middlewares are HTTP-only — no http_count/tcp_count/udp breakdown.
+    User-named provider-suffixed middlewares (``strip@docker``) are NOT
+    internal and should be counted.
     """
     entry, _coord = _entry_with_data(
         {
             "http_middlewares": [
                 {"name": "auth-headers"},
                 {"name": "rate-limit"},
-                {"name": "strip@docker"},
+                {"name": "strip@docker"},  # user middleware, kept
+                {"name": "dashboard_stripprefix@internal"},  # Traefik-internal, dropped
             ],
         }
     )
     entity = TraefikMiddlewaresCountSensor(entry)
-    assert entity.native_value == 2
-    assert entity.extra_state_attributes == {"filtered_count": 2}
+    assert entity.native_value == 3
+    assert entity.extra_state_attributes == {"filtered_count": 3}
 
 
 def test_middlewares_no_overview_breakdown() -> None:
