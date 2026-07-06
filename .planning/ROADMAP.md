@@ -187,7 +187,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02: TraefikCertTimestampSensor + TraefikCertExpiryBinarySensor + stale-cleanup listeners wired to cert_coordinator — TLS-01/02
+- [x] 03-02: TraefikCertTimestampSensor + TraefikCertExpiryBinarySensor + stale-cleanup listeners wired to cert_coordinator — TLS-01/02
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -248,7 +248,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete    | 2026-07-05 |
 | 2. Core Entities + Options + Reauth + Reload | 4/4 | Complete   | 2026-07-05 |
-| 3. TLS Certificate Expiry | 1/3 | In Progress|  |
+| 3. TLS Certificate Expiry | 2/3 | In Progress|  |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
 
 **Coverage:**

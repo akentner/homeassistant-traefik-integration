@@ -88,10 +88,10 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Entities — TLS Certificate Expiry (TLS-01, TLS-02)
 
-- [ ] **TLS-01**: For every router terminating TLS, a `sensor` exposes
+- [x] **TLS-01**: For every router terminating TLS, a `sensor` exposes
       the certificate's `notAfter` timestamp (with `device_class:
       timestamp`) and a `days_until_expiry` attribute.
-- [ ] **TLS-02**: For every TLS-enabled router, a `binary_sensor` turns
+- [x] **TLS-02**: For every TLS-enabled router, a `binary_sensor` turns
       `on` when the certificate is within the user-configurable warning
       threshold (default 14 days) — `BinarySensorDeviceClass.PROBLEM`.
 - [ ] **TLS-03**: TLS fetches use a separate `CertCoordinator` with a
@@ -243,8 +243,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIAG-02 | Phase 2 | Complete |
 | DIAG-03 | Phase 2 | Complete |
 | DIAG-04 | Phase 4 | Pending |
-| TLS-01 | Phase 3 | Pending |
-| TLS-02 | Phase 3 | Pending |
+| TLS-01 | Phase 3 | Complete |
+| TLS-02 | Phase 3 | Complete |
 | TLS-03 | Phase 3 | Pending |
 | TLS-04 | Phase 3 | Pending |
 | TLS-05 | Phase 3 | Pending |
