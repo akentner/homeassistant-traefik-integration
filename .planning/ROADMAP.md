@@ -153,12 +153,12 @@ loop covers all observed `notAfter` shapes. Spike deliverable: spike document
      `Nov 15 12:00:00 2025 GMT`, `Nov 15 12:00:00 2025+00:00`, ISO-style)
      and ≥2 invalid format strings (graceful `unavailable` mapping); a mock
      TLS handshake exercises the cache + semaphore + timeout paths.
-**Plans**: TBD (likely 2-3 plans after spike)
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 03-01: tls.py + CertCoordinator (6h cadence, semaphore, to_thread wrapper, format-string parse loop) + Options Flow additions for CONF_TLS_WARN_DAYS
-- [ ] 03-02: TLS-01 timestamp sensor + TLS-02 expiry binary_sensor platforms + cache wiring into main coordinator
-- [ ] 03-03: TLS tests (format strings, invalid inputs, cache + semaphore + timeout)
+- [ ] 03-01: tls.py + cert_coordinator.py + integration wiring (sibling attach on entry.runtime_data, threshold live re-eval) — TLS-03/04/05
+- [ ] 03-02: TraefikCertTimestampSensor + TraefikCertExpiryBinarySensor + stale-cleanup listeners wired to cert_coordinator — TLS-01/02
+- [ ] 03-03: TEST-04 tests — test_tls.py (format-string parse + graceful error + log throttle), test_cert_coordinator.py (semaphore + timeout + threshold + hostname union), test_sensor_tls.py + test_binary_sensor_tls_expiring.py (entity state derivation + D-04 contract pin)
 
 ### Phase 4: Quality + Diagnostics + Polish + HACS
 **Goal**: v1.0 release-ready — diagnostics dump with credential redaction,
@@ -208,7 +208,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete    | 2026-07-05 |
 | 2. Core Entities + Options + Reauth + Reload | 4/4 | Complete   | 2026-07-05 |
-| 3. TLS Certificate Expiry | 0/TBD | Not started | - |
+| 3. TLS Certificate Expiry | 0/3 | Planned   | - |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
 
 **Coverage:**
