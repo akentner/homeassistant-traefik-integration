@@ -6,7 +6,7 @@
         "description": "Provide the URL of your Traefik instance and the API key from your Traefik static config (api.dashboard / api.insecure).",
         "data": {
           "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
-          "api_key": "Bearer token",
+          "api_key": "Bearer token (optional \u2014 leave empty for Traefik with no api auth)",
           "verify_ssl": "Verify TLS certificate (disable for self-signed)"
         },
         "description_placeholders": {
@@ -21,7 +21,7 @@
         "title": "Reauthenticate Traefik",
         "description": "The Traefik bearer token has been rejected (HTTP 401/403) \u2014 enter the new token from your Traefik static config to continue polling.",
         "data": {
-          "api_key": "New bearer token"
+          "api_key": "New bearer token (optional \u2014 leave empty to clear auth)"
         }
       },
       "reconfigure": {
@@ -29,13 +29,14 @@
         "description": "Update the Traefik base URL and/or bearer token \u2014 the integration will reload against the new endpoint.",
         "data": {
           "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
-          "api_key": "Bearer token",
+          "api_key": "Bearer token (optional \u2014 leave empty for Traefik with no api auth)",
           "verify_ssl": "Verify TLS certificate (disable for self-signed)"
         }
       }
     },
     "error": {
       "cannot_connect": "Unable to reach Traefik \u2014 check URL, network, and that the API is enabled.",
+      "invalid_url": "The URL is malformed. Use http(s)://host:port \u2014 e.g. https://traefik.example.com:8080.",
       "invalid_auth": "Invalid bearer token. Rotate the token in Traefik's static config.",
       "api_disabled": "Traefik's API is not enabled \u2014 add `api: insecure: true` or `api: dashboard: true` to your static config.",
       "unknown": "Unexpected error \u2014 see logs."

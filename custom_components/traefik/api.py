@@ -88,7 +88,7 @@ class TraefikApiClient:
             if err.status in (401, 403):
                 raise TraefikAuthError(str(err)) from err
             raise TraefikApiError(str(err)) from err
-        except (TimeoutError, aiohttp.ClientConnectorError) as err:
+        except (TimeoutError, aiohttp.ClientConnectorError, aiohttp.InvalidUrlClientError) as err:
             raise TraefikApiError(str(err)) from err
 
     # --- Read endpoints ---
@@ -159,7 +159,7 @@ class TraefikApiClient:
             if err.status in (401, 403):
                 raise TraefikAuthError(str(err)) from err
             raise TraefikApiError(str(err)) from err
-        except (TimeoutError, aiohttp.ClientConnectorError) as err:
+        except (TimeoutError, aiohttp.ClientConnectorError, aiohttp.InvalidUrlClientError) as err:
             raise TraefikApiError(str(err)) from err
 
     # --- Aggregated fetch ---

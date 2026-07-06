@@ -26,7 +26,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import voluptuous as vol
-from aiohttp import ClientConnectorError, ClientResponseError
+from aiohttp import ClientConnectorError, ClientResponseError, InvalidUrlClientError
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -36,12 +36,6 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import (
-    BooleanSelector,
-    TextSelector,
-    TextSelectorConfig,
-    TextSelectorType,
-)
 
 from .api import TraefikApiClient, TraefikApiError, TraefikAuthError
 from .const import (
@@ -65,16 +59,16 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_URL): TextSelector(TextSelectorConfig(type=TextSelectorType.URL)),
-        vol.Required(CONF_API_KEY): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
-        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): BooleanSelector(),
+        vol.Required(CONF_URL): vol.All(cv.string, cv.url),
+        vol.Optional(CONF_API_KEY, default=""): cv.string,
+        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     }
 )
 
 STEP_YAML_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_URL): cv.string,
-        vol.Required(CONF_API_KEY): cv.string,
+        vol.Required(CONF_URL): vol.All(cv.string, cv.url),
+        vol.Optional(CONF_API_KEY, default=""): cv.string,
         vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     }
 )
@@ -85,13 +79,13 @@ STEP_YAML_DATA_SCHEMA = vol.Schema(
 # ``options.step.init.errors.scan_interval_out_of_range`` in strings.json.
 STEP_OPTIONS_SCHEMA = vol.Schema(
     {
-        vol.Required(
-            CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-        ): vol.All(int, vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
+        vol.Required(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
+            int, vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)
+        ),
         vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
-        vol.Optional(
-            CONF_TLS_WARN_DAYS, default=DEFAULT_TLS_WARN_DAYS
-        ): vol.All(int, vol.Range(min=MIN_TLS_WARN_DAYS, max=MAX_TLS_WARN_DAYS)),
+        vol.Optional(CONF_TLS_WARN_DAYS, default=DEFAULT_TLS_WARN_DAYS): vol.All(
+            int, vol.Range(min=MIN_TLS_WARN_DAYS, max=MAX_TLS_WARN_DAYS)
+        ),
     }
 )
 
@@ -109,22 +103,45 @@ class ApiDisabled(Exception):
     """Traefik's `api: {}` block not enabled (404 on /api/overview)."""
 
 
+class InvalidUrl(Exception):
+    """The provided URL is malformed (no scheme, bad scheme, missing host)."""
+
+
+_ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
+
+
+def _check_url_shape(url: str) -> None:
+    """Pre-flight URL shape check before handing it to aiohttp.
+
+    Catches the common class of malformed-input bugs that the
+    ``TextSelector(type=URL)`` field cannot block (e.g. ``http;//`` from
+    autocomplete / paste mistakes). Raises :class:`InvalidUrl` if the URL
+    is missing a scheme, has a non-HTTP scheme, or has no host.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in _ALLOWED_URL_SCHEMES or not parsed.netloc:
+        raise InvalidUrl(url)
+
+
 async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
     """Probe /api/overview and map errors to user-friendly exceptions.
 
     Shared by the user / yaml / reauth / reconfigure flows so that the
-    401 -> InvalidAuth, 404 -> ApiDisabled, and everything-else ->
-    CannotConnect mapping is defined exactly once.
+    401 -> InvalidAuth, 404 -> ApiDisabled, invalid URL -> InvalidUrl,
+    and everything-else -> CannotConnect mapping is defined exactly once.
     """
+    _check_url_shape(data[CONF_URL])
     client = TraefikApiClient(
         session=async_get_clientsession(hass),
         base_url=data[CONF_URL],
-        api_key=data[CONF_API_KEY],
+        api_key=data.get(CONF_API_KEY, ""),
         verify_ssl=data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
     )
     try:
         async with asyncio.timeout(10):
             await client.get_overview()
+    except InvalidUrlClientError as err:
+        raise InvalidUrl(data[CONF_URL]) from err
     except TraefikAuthError:
         raise InvalidAuth from None
     except ClientResponseError as err:
@@ -153,9 +170,7 @@ class TraefikOptionsFlow(OptionsFlow):
 
     config_entry: ConfigEntry
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Render the options form and persist user input."""
         errors: dict[str, str] = {}
 
@@ -186,13 +201,13 @@ class TraefikOptionsFlow(OptionsFlow):
 
         # Build a schema whose default values match the current entry options.
         schema_dict: dict[Any, Any] = {
-            vol.Required(
-                CONF_SCAN_INTERVAL, default=defaults[CONF_SCAN_INTERVAL]
-            ): vol.All(int, vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
+            vol.Required(CONF_SCAN_INTERVAL, default=defaults[CONF_SCAN_INTERVAL]): vol.All(
+                int, vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)
+            ),
             vol.Optional(CONF_VERIFY_SSL, default=defaults[CONF_VERIFY_SSL]): cv.boolean,
-            vol.Optional(
-                CONF_TLS_WARN_DAYS, default=defaults[CONF_TLS_WARN_DAYS]
-            ): vol.All(int, vol.Range(min=MIN_TLS_WARN_DAYS, max=MAX_TLS_WARN_DAYS)),
+            vol.Optional(CONF_TLS_WARN_DAYS, default=defaults[CONF_TLS_WARN_DAYS]): vol.All(
+                int, vol.Range(min=MIN_TLS_WARN_DAYS, max=MAX_TLS_WARN_DAYS)
+            ),
         }
         return self.async_show_form(
             step_id="init",
@@ -219,14 +234,14 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         return TraefikOptionsFlow()
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the UI setup step."""
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 await _validate_input(self.hass, user_input)
+            except InvalidUrl:
+                errors["base"] = "invalid_url"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except ApiDisabled:
@@ -253,15 +268,15 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_yaml(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_yaml(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle YAML import (CFG-02)."""
         errors: dict[str, str] = {}
         if user_input is not None:
             validated = STEP_YAML_DATA_SCHEMA(user_input)
             try:
                 await _validate_input(self.hass, validated)
+            except InvalidUrl:
+                errors["base"] = "invalid_url"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except ApiDisabled:
@@ -293,9 +308,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_reauth_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Validate the new bearer token and persist it (CONTEXT.md D-10).
 
         On success: ``async_update_entry`` writes the new token into
@@ -307,7 +320,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reauth_entry()
 
         if user_input is not None:
-            new_api_key = user_input[CONF_API_KEY]
+            new_api_key = user_input.get(CONF_API_KEY, "")
             probe_data = {
                 CONF_URL: entry.data[CONF_URL],
                 CONF_API_KEY: new_api_key,
@@ -315,6 +328,8 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
             }
             try:
                 await _validate_input(self.hass, probe_data)
+            except InvalidUrl:
+                errors["base"] = "invalid_url"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except ApiDisabled:
@@ -331,9 +346,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_API_KEY): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
-                ),
+                vol.Optional(CONF_API_KEY, default=""): cv.string,
             }
         )
         return self.async_show_form(
@@ -342,9 +355,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle in-place URL + token change (CFG-03 / CONTEXT.md D-11).
 
         Pre-fills the form from ``entry.data``. On submit, validates the new
@@ -359,6 +370,8 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 await _validate_input(self.hass, user_input)
+            except InvalidUrl:
+                errors["base"] = "invalid_url"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except ApiDisabled:
@@ -378,10 +391,8 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
                     entry,
                     data_updates={
                         CONF_URL: user_input[CONF_URL],
-                        CONF_API_KEY: user_input[CONF_API_KEY],
-                        CONF_VERIFY_SSL: user_input.get(
-                            CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL
-                        ),
+                        CONF_API_KEY: user_input.get(CONF_API_KEY, ""),
+                        CONF_VERIFY_SSL: user_input.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
                     },
                 )
 
@@ -394,15 +405,9 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         schema = vol.Schema(
             {
-                vol.Required(CONF_URL, default=defaults[CONF_URL]): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.URL)
-                ),
-                vol.Required(
-                    CONF_API_KEY, default=defaults[CONF_API_KEY]
-                ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
-                vol.Optional(
-                    CONF_VERIFY_SSL, default=defaults[CONF_VERIFY_SSL]
-                ): BooleanSelector(),
+                vol.Required(CONF_URL, default=defaults[CONF_URL]): vol.All(cv.string, cv.url),
+                vol.Optional(CONF_API_KEY, default=defaults[CONF_API_KEY]): cv.string,
+                vol.Optional(CONF_VERIFY_SSL, default=defaults[CONF_VERIFY_SSL]): cv.boolean,
             }
         )
         return self.async_show_form(
