@@ -9,7 +9,7 @@ echo "║  Running all 4 spikes for 3-tls-handshake                   ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo
 
-for spike in 001-stdlib-tls-handshake 002-notafter-format-strings 003-sni-routing-multicert 004-error-handling-async-wrap; do
+for spike in 001-stdlib-tls-handshake 002-notafter-format-strings 003-sni-routing-multicert 004-error-handling-async-wrap 005-asyncio-open-connection 006-hostname-mismatch-detection 007-dns-preflight; do
     echo "┌── $spike ──"
     if [[ "$spike" == "003-sni-routing-multicert" ]]; then
         # Ensure certs are generated.
