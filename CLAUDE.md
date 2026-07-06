@@ -231,6 +231,14 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 
 
 
+<!-- GSD:skill-routing-start source:.claude/skills/spike-findings-homeassistant-traefik-integration/SKILL.md -->
+## Skill Auto-Routing
+
+- **TLS handshake patterns (stdlib ssl + socket, SNI routing, notAfter parsing, async wrapping)** → `Skill("spike-findings-homeassistant-traefik-integration")` (loaded automatically during Phase 3 work)
+<!-- GSD:skill-routing-end -->
+
+
+
 <!-- GSD:profile-start -->
 ## Developer Profile
 
