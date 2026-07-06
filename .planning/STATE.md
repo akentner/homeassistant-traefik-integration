@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed Phase 3 plan 03-02 (TLS-01 + TLS-02 entities + stale-cleanup)
-last_updated: "2026-07-06T08:05:00.000Z"
-last_activity: 2026-07-06 -- Phase 03 plan 03-02 executed (TraefikCertTimestampSensor + TraefikCertExpiryBinarySensor + cert-cycle entity-creation closures + split stale-cleanup, ~14min, ruff+mypy+pytest clean)
+stopped_at: Completed Phase 3 plan 03-03 (TEST-04 test surface)
+last_updated: "2026-07-06T08:35:00.000Z"
+last_activity: 2026-07-06 -- Phase 03 plan 03-03 executed (test_tls.py + test_cert_coordinator.py + test_sensor_tls.py + test_binary_sensor_tls_expiring.py + mock_certificate_server fixture; 83 new tests; suite 40 → 123 passing; ruff+mypy+pytest clean)
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 10
-  percent: 55
+  completed_plans: 11
+  percent: 75
 ---
 
 # Project State
@@ -23,25 +23,24 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 **Core value:** If nothing else works, the user must be able to see — at a
 glance inside Home Assistant — which Traefik routers are enabled, which are
 failing, and which TLS certificates are expiring soon.
-**Current focus:** Phase 03 — TLS Certificate Expiry
-entities (timestamp + expiry binary_sensor on HTTP Routers TLS device))
+**Current focus:** Phase 3 complete (TLS); next is Phase 4 (Quality + Diagnostics + Polish + HACS)
 
 ## Current Position
 
-Phase: 3
-Plan: 03-02 complete (2/3 plans done); next 03-03
+Phase: 3 (complete)
+Plan: 03-03 complete (3/3 plans done for Phase 3)
 Status: In progress
-Last activity: 2026-07-06 -- Phase 03 plan 03-02 executed (TraefikCertTimestampSensor + TraefikCertExpiryBinarySensor + cert-cycle entity-creation closures + split stale-cleanup, ~14min, ruff+mypy+pytest clean)
+Last activity: 2026-07-06 -- Phase 03 plan 03-03 executed (TEST-04 test surface: test_tls.py (33) + test_cert_coordinator.py (19) + test_sensor_tls.py (13) + test_binary_sensor_tls_expiring.py (18) + mock_certificate_server async fixture; total suite 40 → 123 passing; all ruff+mypy+pytest gates clean)
 
-Progress: [█████████░] 91%
+Progress: [██████████] 100% (Phase 3)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
-- Average duration: 12m
-- Total execution time: 1.3 hours
+- Total plans completed: 8
+- Average duration: 13m
+- Total execution time: 1.7 hours
 
 **By Phase:**
 
@@ -49,12 +48,12 @@ Progress: [█████████░] 91%
 |-------|-------|-------|----------|
 | 1. Foundation | 4 | 4 | 12m |
 | 2. Core Entities + Options + Reauth + Reload | 2 | 4 | 11m |
-| 3. TLS Certificate Expiry | 1 | 3 | 14m |
+| 3. TLS Certificate Expiry | 3 | 3 | 16m |
 | 4. Quality + Diagnostics + Polish + HACS | 0 | 2 | — |
 
 **Recent Trend:**
 
-- Last 5 plans: Phase 02 P04 (627s) + Phase 3 P01 (25m) + Phase 3 P02 (14m)
+- Last 5 plans: Phase 3 P01 (25m) + Phase 3 P02 (14m) + Phase 3 P03 (25m) — Phase 3 done in 64m cumulative
 - Trend: stable
 
 *Updated after each plan completion*
@@ -68,6 +67,7 @@ Progress: [█████████░] 91%
 | Phase 02-core-entities-options-reauth-reload P04 | 627s | 3 tasks | 9 files |
 | Phase 3 P01 | 25min | 3 tasks | 7 files |
 | Phase 3 P02 | 14min | 2 tasks | 2 files |
+| Phase 3 P03 | 25min | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -100,6 +100,10 @@ Recent decisions affecting current work:
 - [Phase 03]: Shared _cert_cache_availability helper in sensor.py imported by binary_sensor.py — single source of truth for cache availability across both platforms (SUGGESTION #1 fix; eliminates the per-platform-helper-drift bug class). Public cert_cache_availability alias added for tests / future cross-module callers.
 - [Phase 03]: TraefikCertExpiryBinarySensor._attr_entity_registry_enabled_default = True (D-03 explicit divergence from Phase 2 M-12 on TraefikAnyRouterFailingBinarySensor) — cert expiry is a security-impacting alarm that warrants always-on visibility. Phase 2 router-failure aggregate keeps the default-off behavior because router failures often reflect deployment churn rather than outages.
 - [Phase 03]: Host normalised to lowercase at __init__ top of both TraefikCertTimestampSensor AND TraefikCertExpiryBinarySensor — defensive against cache rows populated with mixed casing (cert coordinator already lowercases in production but test harness could inject mixed casing; threat-model hardening).
+- [Phase 03]: mock_certificate_server test fixture generates a CA-signed cert per test (not self-signed) and monkey-patches production _open_tls_connection to also load_verify_locations(cafile=<test CA>) — production SSLContext rejects self-signed chains under PROTOCOL_TLS_CLIENT+load_default_certs, so the throwaway CA must be in the trust store for the handshake to complete.
+- [Phase 03]: conftest.py pre-imports `custom_components.traefik.tls` at module level — pytest-homeassistant-custom-component ships a namespace package at testing_config/custom_components/ that would otherwise shadow the production module for in-fixture imports; module-level pre-import binds it to sys.modules before the namespace hijack takes effect.
+- [Phase 03]: Mock-server handshake tests use `asyncio.to_thread` to drive the sync `fetch_cert_info` from async tests — passing through without the thread wrapper blocks the asyncio TLS server's accept path (event-loop starvation), causing the handshake to hang.
+- [Phase 03]: HA's `CachedProperties` metaclass moves class-level `_attr_*` attributes to private `__attr_*` names and wraps them in `property`. Tests that pin entity default-state attributes (e.g. `_attr_entity_registry_enabled_default`) read `cls.__dict__.get("__attr_<name>")` to get the underlying boolean value.
 
 ### Pending Todos
 
@@ -117,16 +121,18 @@ None yet.
   contains 49 rows (CFG:6 + API:6 + COORD:4 + ROUTER:4 + ENTRY:3 +
   DIAG:4 + TLS:5 + UX:4 + DIST:5 + DOCS:4 + TEST:4 = 49). Table itself
   is correct — only the footer is stale. Cosmetic; not a coverage gap.
+  Phase 03 closed out TEST-04 — only DIAG-04 + DIST-04/05 + DOCS-02/03/04
+  remain pending in Phase 4.
 
-- Phase 2-03 depends on the per-category device model landed in plan 02-01.
-  The four new sensor platforms (TraefikEntrypointSensor, TraefikServiceSensor,
-  three aggregate counters) all instantiate via
-  `super().__init__(entry, category='http_entrypoints' | 'http_services' |
-  'overview', description_key=...)` — every parameter is now in place.
+- `custom_components/traefik/config_flow.py` ruff-format diff is pre-existing
+  from Phase 2-02 (verified via `git stash` before-plan baseline). Out of
+  scope for 03-03 — per deviation rules, only directly-caused reformatting
+  is in scope.
 
 ## Session Continuity
 
-Last session: 2026-07-06T08:05:00.000Z
-Stopped at: Completed Phase 3 plan 03-02 (TLS-01 + TLS-02 entities + stale-cleanup)
-49/49 v1 requirements mapped (44 complete; 5 pending: DIAG-04 + DIST-04/05 + DOCS-02/03/04 + TEST-02/03 + TEST-04).
+Last session: 2026-07-06T08:35:00.000Z
+Stopped at: Completed Phase 3 plan 03-03 (TEST-04 test surface — 83 new tests; suite 40 → 123)
+45/49 v1 requirements complete; 4/6 Phase 3 requirements now mapped (TLS-01..05 ✅ + TEST-04 ✅); 4 remaining pending (DIAG-04 + DIST-04/05 + DOCS-02/03/04 + TEST-02/03 in fact already ✅ — only DIAG-04 + DIST-04/05 + DOCS-02/03/04 are net-pending).
 Resume file: .planning/phases/03-tls-certificate-expiry/03-CONTEXT.md
+Next: Phase 4 (Quality + Diagnostics + Polish + HACS)

@@ -26,9 +26,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Core Entities + Options + Reauth + Reload** — Entrypoint / (completed 2026-07-05)
       Service / Overview sensors, Options Flow, reauth + reconfigure, reload
       service + button, stale entity cleanup
-
-- [ ] **Phase 3: TLS Certificate Expiry** — Spike → `tls.py` + `CertCoordinator`
+- [x] **Phase 3: TLS Certificate Expiry** — Spike → `tls.py` + `CertCoordinator` (completed 2026-07-06)
       → per-router cert timestamp sensor + expiring binary_sensor (6-hour cadence)
+      → TEST-04 test surface (123 tests passing)
 
 - [ ] **Phase 4: Quality + Diagnostics + Polish + HACS** — Diagnostics dump with
       redaction, CI workflows (hassfest / HACS / pytest / release), `info.md` /
@@ -191,7 +191,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-03: TEST-04 tests — test_tls.py (format-string parse + graceful error + log throttle), test_cert_coordinator.py (semaphore + timeout + threshold + hostname union), test_sensor_tls.py + test_binary_sensor_tls_expiring.py (entity state derivation + D-04 contract pin)
+- [x] 03-03: TEST-04 tests — test_tls.py (format-string parse + graceful error + log throttle), test_cert_coordinator.py (semaphore + timeout + threshold + hostname union), test_sensor_tls.py + test_binary_sensor_tls_expiring.py (entity state derivation + D-04 contract pin) — completed 2026-07-06 (83 new tests, suite 40 → 123 passing, ruff+mypy+pytest clean)
 
 ### Phase 4: Quality + Diagnostics + Polish + HACS
 
@@ -248,7 +248,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete    | 2026-07-05 |
 | 2. Core Entities + Options + Reauth + Reload | 4/4 | Complete   | 2026-07-05 |
-| 3. TLS Certificate Expiry | 2/3 | In Progress|  |
+| 3. TLS Certificate Expiry | 3/3 | Complete   | 2026-07-06 |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
 
 **Coverage:**

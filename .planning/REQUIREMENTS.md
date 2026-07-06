@@ -154,8 +154,15 @@ Requirements for initial release. Each maps to a roadmap phase.
       options flow, reload service, and reauth flow.
 - [x] **TEST-03**: A test fixture captures a realistic Traefik `/api/...`
       payload so integration tests stay hermetic.
-- [ ] **TEST-04**: TLS parsing tests cover ≥3 known `notAfter` format
+- [x] **TEST-04**: TLS parsing tests cover ≥3 known `notAfter` format
       strings and ≥2 invalid format strings (graceful unavailable state).
+      Satisfied by `tests/test_tls.py` (33 tests) + `tests/test_cert_coordinator.py` (19)
+      + `tests/test_sensor_tls.py` (13) + `tests/test_binary_sensor_tls_expiring.py` (18)
+      — Phase 3 plan 03-03 closed out the full TEST-04 surface with 83 new tests,
+      suite 40 → 123 passing. Covered: 6 known + 5 invalid format strings, 24h
+      log throttle, RFC 6125 wildcard SAN matching, graceful error paths (refused /
+      dns / wrong-port), real mock-TLS handshake via openssl-driven asyncio server
+      fixture.
 
 ### Diagnostics (DIAG-04)
 
@@ -264,7 +271,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 2 | Complete |
 | TEST-03 | Phase 1 | Complete |
-| TEST-04 | Phase 3 | Pending |
+| TEST-04 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 46 total
