@@ -183,7 +183,7 @@ loop covers all observed `notAfter` shapes. Spike deliverable: spike document
 Plans:
 **Wave 1**
 
-- [ ] 03-01: tls.py + cert_coordinator.py + integration wiring (sibling attach on entry.runtime_data, threshold live re-eval) — TLS-03/04/05
+- [x] 03-01: tls.py + cert_coordinator.py + integration wiring (sibling attach on entry.runtime_data, threshold live re-eval) — TLS-03/04/05
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -248,7 +248,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | Complete    | 2026-07-05 |
 | 2. Core Entities + Options + Reauth + Reload | 4/4 | Complete   | 2026-07-05 |
-| 3. TLS Certificate Expiry | 0/3 | Planned   | - |
+| 3. TLS Certificate Expiry | 1/3 | In Progress|  |
 | 4. Quality + Diagnostics + Polish + HACS | 0/TBD | Not started | - |
 
 **Coverage:**
