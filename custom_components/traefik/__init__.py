@@ -12,6 +12,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_validation as cv
 
 from .cert_coordinator import CertCoordinator
 from .const import (
@@ -25,6 +26,13 @@ from .const import (
 from .coordinator import TraefikConfigEntry, TraefikCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# CONFIG_SCHEMA is required by hassfest whenever ``async_setup`` is implemented.
+# The integration is config-flow only — YAML setup is intentionally unsupported —
+# so this is the canonical empty-marker. See:
+# https://developers.home-assistant.io/docs/config_entries_config_flow_handler/#config_flow-only
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 # CONTEXT.md D-12: reload_routers takes no parameters — the service is

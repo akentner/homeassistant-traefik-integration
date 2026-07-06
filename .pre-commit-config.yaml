@@ -1,0 +1,66 @@
+# Pre-commit hooks for homeassistant-traefik-integration.
+#
+# Mirrors the GH Actions validate.yml locally so common issues (ruff, format,
+# mypy, manifest key order, JSON parse) surface before pushing.
+#
+# Install ONE of:
+#   uv tool install pre-commit  &&  pre-commit install
+#   make install-hooks                # copies scripts/pre-commit into .git/hooks/
+
+default_language_version:
+  python: python3.13
+
+repos:
+  # General repo hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+        files: ^(custom_components/.*\.json|\.github/.*\.json)$
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # Ruff (lint + format)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.15
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+        files: ^(custom_components/traefik|tests)/.*\.py$
+      - id: ruff-format
+        files: ^(custom_components/traefik|tests)/.*\.py$
+
+  # Mypy (strict)
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict (custom_components)
+        entry: uv run mypy --strict custom_components
+        language: system
+        files: ^custom_components/traefik/.*\.py$
+        pass_filenames: false
+        types: [python]
+
+  # Hassfest-style sanity checks (no docker needed)
+  - repo: local
+    hooks:
+      - id: hassfest-manifest-order
+        name: hassfest manifest key order (domain, name, alphabetical)
+        entry: python scripts/hassfest_checks.py manifest-order
+        language: system
+        files: ^custom_components/traefik/manifest\.json$
+        pass_filenames: false
+
+      - id: hassfest-strings-shape
+        name: hassfest strings.json shape (no top-level reauth/reconfigure/entity, no URLs in labels)
+        entry: python scripts/hassfest_checks.py strings-shape
+        language: system
+        files: ^custom_components/traefik/(strings|translations/.*)\.json$
+        pass_filenames: false

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Standalone pre-commit hook for users without the pre-commit framework.
+# Mirrors the GH Actions validate.yml gates locally before each commit.
+#
+# Install via:  make install-hooks  OR  cp scripts/pre-commit .git/hooks/pre-commit
+#
+# The hook skips itself for `--no-verify` commits (git handles that) and
+# only inspects staged Python + JSON files for speed. Full test suite
+# runs in CI, not here.
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+blue()  { printf '\033[34m%s\033[0m\n' "$*"; }
+
+run() {
+    local label="$1"
+    shift
+    blue "▶ $label"
+    if "$@"; then
+        green "  ✓ $label"
+    else
+        red "  ✗ $label"
+        red "Pre-commit failed at: $label"
+        red "Bypass with:  git commit --no-verify"
+        exit 1
+    fi
+}
+
+# --- JSON parse + hassfest-style sanity (mirrors GH hassfest step) ---
+run "JSON parse + hassfest sanity" \
+    uv run python scripts/hassfest_checks.py all
+
+# --- Ruff lint ---
+STAGED_PY="$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.py$' || true)"
+if [ -n "${STAGED_PY:-}" ]; then
+    run "ruff check" \
+        uv run ruff check $STAGED_PY
+    run "ruff format --check" \
+        uv run ruff format --check $STAGED_PY
+fi
+
+# --- Mypy strict (full module, fast enough on every commit) ---
+run "mypy --strict" \
+    uv run mypy --strict custom_components
+
+green "All pre-commit checks passed."

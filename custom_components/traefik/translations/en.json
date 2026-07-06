@@ -3,19 +3,16 @@
     "step": {
       "user": {
         "title": "Connect to Traefik",
-        "description": "Provide the URL of your Traefik instance and the API key from your Traefik static config (api.dashboard / api.insecure).",
+        "description": "Provide the URL of your Traefik instance and the API key from your Traefik static config (api.dashboard / api.insecure). Plain HTTP transmits the bearer token in cleartext \u2014 use HTTPS whenever possible.",
         "data": {
-          "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
+          "url": "Traefik base URL",
           "api_key": "Bearer token (optional \u2014 leave empty for Traefik with no api auth)",
           "verify_ssl": "Verify TLS certificate (disable for self-signed)"
-        },
-        "description_placeholders": {
-          "http_warning": "Warning: plain HTTP transmits the bearer token in cleartext. Use HTTPS whenever possible."
         }
       },
       "yaml": {
         "title": "YAML configuration detected",
-        "description": "Configure traefik: block in configuration.yaml. The integration validates the URL + token before saving."
+        "description": "Configure the traefik: block in configuration.yaml. The integration validates the URL and token before saving."
       },
       "reauth_confirm": {
         "title": "Reauthenticate Traefik",
@@ -28,7 +25,7 @@
         "title": "Reconfigure Traefik",
         "description": "Update the Traefik base URL and/or bearer token \u2014 the integration will reload against the new endpoint.",
         "data": {
-          "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
+          "url": "Traefik base URL",
           "api_key": "Bearer token (optional \u2014 leave empty for Traefik with no api auth)",
           "verify_ssl": "Verify TLS certificate (disable for self-signed)"
         }
@@ -36,9 +33,9 @@
     },
     "error": {
       "cannot_connect": "Unable to reach Traefik \u2014 check URL, network, and that the API is enabled.",
-      "invalid_url": "The URL is malformed. Use http(s)://host:port \u2014 e.g. https://traefik.example.com:8080.",
-      "invalid_auth": "Invalid bearer token. Rotate the token in Traefik's static config.",
-      "api_disabled": "Traefik's API is not enabled \u2014 add `api: insecure: true` or `api: dashboard: true` to your static config.",
+      "invalid_url": "The URL is malformed. Use the http or https scheme and a non-empty host.",
+      "invalid_auth": "Invalid bearer token. Rotate the token in your Traefik static config.",
+      "api_disabled": "Traefik's API is not enabled \u2014 add the api block to your static config.",
       "unknown": "Unexpected error \u2014 see logs."
     },
     "abort": {
@@ -55,38 +52,16 @@
           "scan_interval": "Polling interval (seconds, 15-300)",
           "verify_ssl": "Verify TLS certificate (disable for self-signed)",
           "tls_warn_days": "Certificate warning threshold (days before expiry, 1-90)"
-        },
-        "errors": {
-          "scan_interval_out_of_range": "Polling interval must be between 15 and 300 seconds."
-        }
-      }
-    }
-  },
-  "reauth": {
-    "step": {
-      "confirm": {
-        "title": "Reauthenticate Traefik",
-        "description": "The Traefik bearer token has been rejected (HTTP 401/403) \u2014 enter the new token from your Traefik static config to continue polling.",
-        "data": {
-          "api_key": "New bearer token"
         }
       }
     },
-    "abort": {
-      "reauth_successful": "Traefik reauthenticated."
+    "error": {
+      "scan_interval_out_of_range": "Polling interval must be between 15 and 300 seconds."
     }
   },
-  "reconfigure": {
-    "step": {
-      "user": {
-        "title": "Reconfigure Traefik",
-        "description": "Update the Traefik base URL and/or bearer token \u2014 the integration will reload against the new endpoint.",
-        "data": {
-          "url": "Traefik base URL (e.g. https://traefik.example.com:8080)",
-          "api_key": "Bearer token",
-          "verify_ssl": "Verify TLS certificate (disable for self-signed)"
-        }
-      }
+  "exceptions": {
+    "cert_unavailable": {
+      "message": "TLS probe failed \u2014 {error}. See logbook for details."
     }
   }
 }

@@ -258,14 +258,10 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=user_input,
                 )
 
-        http_warning = "" if (user_input or {}).get(CONF_URL, "").startswith("https://") else "config_flow_warning_http"
         return self.async_show_form(
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
-            description_placeholders={
-                "http_warning": http_warning,
-            },
         )
 
     async def async_step_yaml(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
