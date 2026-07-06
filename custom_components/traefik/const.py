@@ -28,6 +28,17 @@ MIN_TLS_WARN_DAYS: Final = 1
 MAX_TLS_WARN_DAYS: Final = 90
 DEFAULT_TLS_WARN_DAYS: Final = 14
 
+# Phase 3 cert-cycle knobs (CONTEXT.md D-05). ``TLS_HANDSHAKE_TIMEOUT`` caps
+# the per-host TLS handshake at 5s — a hanging host cannot stall the cycle
+# indefinitely. ``TLS_SEMAPHORE`` bounds concurrent handshakes to 4 (a
+# hostile config with 10k routers would otherwise fan out a thundering
+# herd). ``DEFAULT_TLS_CERT_COOLDOWN`` is the 6h cadence (21600s) — the
+# spike's 6h default; a 14d warning threshold with 6h probes means a
+# user is alerted within ±6h of a cert entering the warning window.
+TLS_HANDSHAKE_TIMEOUT: Final = 5.0
+TLS_SEMAPHORE: Final = 4
+DEFAULT_TLS_CERT_COOLDOWN: Final = 21600
+
 # Version - bumped manually; CI in Plan 04 enforces match with git tag
 VERSION: Final = "1.0.0"
 
