@@ -13,9 +13,12 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
+from .cert_coordinator import CertCoordinator
 from .const import (
     CONF_SCAN_INTERVAL,
+    CONF_TLS_WARN_DAYS,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TLS_WARN_DAYS,
     DOMAIN,
     PLATFORMS,
 )
@@ -166,16 +169,69 @@ async def _async_options_updated(hass: HomeAssistant, entry: TraefikConfigEntry)
         entry.entry_id,
         scan_interval,
     )
+    # CONTEXT.md D-08: push tls_warn_days into CertCoordinator and
+    # immediately re-render all cert binary sensors (no re-handshake
+    # needed — threshold change is a UX concern, cert data is unchanged).
+    # Defensive try/except so an options-mutation race never blocks the
+    # listener from completing.
+    cert_coordinator = getattr(coordinator, "cert_coordinator", None)
+    if cert_coordinator is not None:
+        new_threshold = entry.options.get(CONF_TLS_WARN_DAYS, DEFAULT_TLS_WARN_DAYS)
+        try:
+            await cert_coordinator.async_set_threshold(new_threshold)
+        except Exception as err:  # final-resort catch-all; listener must complete
+            _LOGGER.debug(
+                "CertCoordinator.async_set_threshold raised (listener continues): %s",
+                err,
+            )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> bool:
-    """Set up Traefik from a config entry."""
+    """Set up Traefik from a config entry.
+
+    Order matters (CONTEXT.md D-05/D-10):
+
+    1. Build main ``TraefikCoordinator`` and await its first refresh —
+       first_refresh raises ``ConfigEntryNotReady`` on transient failure,
+       or ``ConfigEntryAuthFailed`` on 401/403 (auto-retried by HA on
+       NotReady, or surfaced to the reauth flow on AuthFailed).
+    2. Set ``entry.runtime_data = coordinator`` so the cert coordinator
+       can read the main coordinator's ``data`` dict in step 4.
+    3. Build the sibling ``CertCoordinator`` and attach it to the main
+       coordinator (PITFALLS #6 — NOT a runtime_data shape migration).
+    4. ``try/except``-guarded first refresh on the cert coordinator — a
+       TLS failure on the first cycle must NOT also raise
+       ``ConfigEntryNotReady`` (CONTEXT.md D-10). On failure we seed an
+       empty cache via ``async_set_updated_data({})`` so the platforms
+       see a defined state instead of awaiting an unfinished refresh.
+    5. Forward platforms (sensor, binary_sensor, button).
+    """
     coordinator = TraefikCoordinator(hass, entry)
-    # first_refresh raises ConfigEntryNotReady on transient failure, or
-    # ConfigEntryAuthFailed on 401/403 (auto-retried by HA on NotReady, or
-    # surfaced to the reauth flow on AuthFailed).
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+
+    # Phase 3: build and attach the cert coordinator (PITFALLS #6 sibling
+    # attach — entry.runtime_data shape is unchanged). The cert
+    # coordinator reads hostnames from the main coordinator's
+    # ``data["http_routers"]`` cache, which requires
+    # ``entry.runtime_data = coordinator`` to be set first.
+    cert_coordinator = CertCoordinator(hass, entry)
+    coordinator.cert_coordinator = cert_coordinator
+    _LOGGER.debug(
+        "cert coordinator initialised: update_interval=%ds threshold=%d",
+        int(cert_coordinator.update_interval.total_seconds()) if cert_coordinator.update_interval else 0,
+        cert_coordinator.threshold_days,
+    )
+    try:
+        await cert_coordinator.async_config_entry_first_refresh()
+    except Exception as err:  # final-resort catch-all; cert failure must not raise ConfigEntryNotReady
+        _LOGGER.debug(
+            "cert coordinator first refresh failed (TLS probes deferred to next 6h cycle): %s",
+            err,
+        )
+        # Seed an empty cache so the platforms see a defined state
+        # instead of awaiting an unfinished refresh.
+        cert_coordinator.async_set_updated_data({})
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

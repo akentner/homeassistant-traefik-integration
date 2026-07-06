@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 # the manufacturer and the category is the model.
 _CATEGORY_TO_MODEL: Final[dict[str, str]] = {
     "http_routers": "HTTP Routers",
+    "http_routers_tls": "HTTP Routers TLS",  # Phase 3 — TLS probe results live on their own device
     "http_services": "HTTP Services",
     "http_entrypoints": "HTTP Entrypoints",
     "overview": "Overview",

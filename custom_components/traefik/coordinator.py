@@ -1,10 +1,10 @@
-"""DataUpdateCoordinator for the Traefik integration."""
+"""DataUpdateCoordinator for the Traefik integration (Phase 2 + Phase 3 sibling attach)."""
 
 from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -24,6 +24,9 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_VERIFY_SSL,
 )
+
+if TYPE_CHECKING:
+    from .cert_coordinator import CertCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,10 +62,19 @@ type TraefikConfigEntry = ConfigEntry["TraefikCoordinator"]
 
 
 class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
-    """Single polling point for Traefik state."""
+    """Single polling point for Traefik state.
+
+    Phase 3 sibling attach (PITFALLS #6): the cert coordinator is stored as
+    ``cert_coordinator`` on this instance rather than as a separate
+    ``runtime_data`` shape. Existing accessors like
+    ``entry.runtime_data.client.reload_routers()`` keep working — the
+    ``entry.runtime_data`` value is the main ``TraefikCoordinator`` itself,
+    with the cert coordinator as an additional attribute.
+    """
 
     config_entry: TraefikConfigEntry
     client: TraefikApiClient
+    cert_coordinator: CertCoordinator | None = None
 
     def __init__(self, hass: HomeAssistant, entry: TraefikConfigEntry) -> None:
         """Construct coordinator from a config entry's data + options."""

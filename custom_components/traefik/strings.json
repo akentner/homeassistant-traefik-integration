@@ -87,5 +87,18 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "cert_unavailable": {
+      "message": "TLS probe failed \u2014 {error}. See logbook for details."
+    }
+  },
+  "entity": {
+    "cert_timestamp_sensor": {
+      "name": "TLS certificate expires"
+    },
+    "cert_expiring_binary_sensor": {
+      "name": "TLS certificate expiring soon"
+    }
   }
 }
