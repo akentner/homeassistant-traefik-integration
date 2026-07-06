@@ -20,7 +20,6 @@ from unittest.mock import MagicMock
 
 import aiohttp
 import pytest
-import voluptuous as vol
 
 from custom_components.traefik.api import TraefikApiClient, TraefikApiError
 from custom_components.traefik.config_flow import (
@@ -52,10 +51,20 @@ GOOD_URL = "https://traefik.example.com:8080"
         "",  # empty
     ],
 )
-def test_user_schema_rejects_bad_urls(url: str) -> None:
-    """``STEP_USER_DATA_SCHEMA`` rejects every malformed URL via ``cv.url``."""
-    with pytest.raises(vol.Invalid):
-        STEP_USER_DATA_SCHEMA({CONF_URL: url})
+def test_user_schema_accepts_any_url_string(url: str) -> None:
+    """``STEP_USER_DATA_SCHEMA`` accepts arbitrary URL strings as plain text.
+
+    v0.1.3 note: ``vol.All(cv.string, cv.url)`` (used in v0.1.0..v0.1.2)
+    breaks ``voluptuous_serialize.convert`` — HA's frontend JSON-over-WS
+    config-flow endpoint raises ``ValueError: Unable to convert schema:
+    <function url at 0x…>`` (see PR-28788275285). The schema now uses
+    ``TextSelector(type=URL)`` which serialises as a selector block; the
+    browser additionally rejects malformed URLs via HA's URL input
+    handler, and server-side ``_check_url_shape`` provides the final
+    defence with ``errors["base"] = "invalid_url"``.
+    """
+    out = STEP_USER_DATA_SCHEMA({CONF_URL: url})
+    assert out[CONF_URL] == url
 
 
 @pytest.mark.parametrize(
@@ -64,6 +73,7 @@ def test_user_schema_rejects_bad_urls(url: str) -> None:
         "http://traefik.example.com:8080",
         "https://traefik.local",
         "https://192.168.178.3:8080",
+        "http;//malformed-on-purpose",
     ],
 )
 def test_user_schema_accepts_http_and_https(url: str) -> None:
@@ -84,10 +94,34 @@ def test_user_schema_omitted_api_key_defaults_to_empty() -> None:
     assert out[CONF_API_KEY] == ""
 
 
-def test_yaml_schema_rejects_bad_urls() -> None:
-    """YAML schema (used by ``async_step_yaml``) also enforces URL shape."""
-    with pytest.raises(vol.Invalid):
-        STEP_YAML_DATA_SCHEMA({CONF_URL: "http;//foo.bar"})
+def test_user_schema_serializes_for_config_flow_endpoint() -> None:
+    """``voluptuous_serialize.convert`` is what HA's frontend JSON-over-WS
+    config flow endpoint calls before shipping the form to the browser.
+
+    v0.1.3 regression: ``vol.All(cv.string, cv.url)`` serialized as
+    ``<function url at 0x…>`` and raised ``ValueError`` in the reconfigure
+    flow. The fix is to use a ``TextSelector(type=URL)`` for UI schemas so
+    the serializer can introspect a known type instead of a function ref.
+    """
+    import voluptuous_serialize
+    from homeassistant.helpers import config_validation as cv
+
+    from custom_components.traefik.config_flow import STEP_USER_DATA_SCHEMA
+
+    serialized = voluptuous_serialize.convert(STEP_USER_DATA_SCHEMA, custom_serializer=cv.custom_serializer)
+    assert isinstance(serialized, list)
+    assert len(serialized) == 3
+    # URL field becomes a selector block of type=text/url.
+    by_name = {field["name"]: field for field in serialized}
+    assert by_name["url"]["selector"] == {"text": {"type": "url", "multiple": False, "multiline": False}}
+    assert by_name["api_key"]["selector"]["text"]["type"] == "password"
+
+
+def test_yaml_schema_accepts_arbitrary_url_string() -> None:
+    """YAML schema is plain string validation; URL shape is checked by
+    ``_check_url_shape`` after submission (see v0.1.3 release notes)."""
+    out = STEP_YAML_DATA_SCHEMA({CONF_URL: "http;//foo.bar"})
+    assert out[CONF_URL] == "http;//foo.bar"
 
 
 # ----------------------- _check_url_shape -----------------------

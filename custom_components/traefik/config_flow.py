@@ -36,6 +36,12 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    BooleanSelector,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import TraefikApiClient, TraefikApiError, TraefikAuthError
 from .const import (
@@ -57,17 +63,26 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# UI schemas use Home Assistant's typed selectors so HA's frontend can render
+# the right input widget AND so ``voluptuous_serialize`` can serialise the
+# schema for the JSON-over-WS config flow (a raw ``cv.url`` function ref in
+# ``vol.All(cv.string, cv.url)`` breaks that serializer — see v0.1.3 release
+# notes). URL shape is additionally enforced server-side by
+# :func:`_check_url_shape` so a malformed URL still surfaces
+# ``errors["base"] = "invalid_url"``.
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_URL): vol.All(cv.string, cv.url),
-        vol.Optional(CONF_API_KEY, default=""): cv.string,
-        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
+        vol.Required(CONF_URL): TextSelector(TextSelectorConfig(type=TextSelectorType.URL)),
+        vol.Optional(CONF_API_KEY, default=""): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): BooleanSelector(),
     }
 )
 
+# YAML schema has no frontend — plain string validators only; URL shape is
+# revalidated by :func:`_validate_input` → :func:`_check_url_shape`.
 STEP_YAML_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_URL): vol.All(cv.string, cv.url),
+        vol.Required(CONF_URL): cv.string,
         vol.Optional(CONF_API_KEY, default=""): cv.string,
         vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     }
@@ -401,9 +416,13 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         schema = vol.Schema(
             {
-                vol.Required(CONF_URL, default=defaults[CONF_URL]): vol.All(cv.string, cv.url),
-                vol.Optional(CONF_API_KEY, default=defaults[CONF_API_KEY]): cv.string,
-                vol.Optional(CONF_VERIFY_SSL, default=defaults[CONF_VERIFY_SSL]): cv.boolean,
+                vol.Required(CONF_URL, default=defaults[CONF_URL]): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.URL)
+                ),
+                vol.Optional(CONF_API_KEY, default=defaults[CONF_API_KEY]): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                ),
+                vol.Optional(CONF_VERIFY_SSL, default=defaults[CONF_VERIFY_SSL]): BooleanSelector(),
             }
         )
         return self.async_show_form(
