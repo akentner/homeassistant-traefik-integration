@@ -7,8 +7,8 @@ Covers:
   instead of HA's generic "Unknown error occurred".
 - ``STEP_USER_DATA_SCHEMA`` accepts an empty ``api_key`` (``TextSelector``
   with URL type used to mask the field; ``cv.url`` rejects bad schemes).
-- ``TraefikApiClient._get`` no longer lets ``InvalidUrlClientError`` bubble —
-  it gets classified as ``TraefikApiError`` so the coordinator sees a clean
+- ``TraefikProxyApiClient._get`` no longer lets ``InvalidUrlClientError`` bubble —
+  it gets classified as ``TraefikProxyApiError`` so the coordinator sees a clean
   ``UpdateFailed`` on subsequent cycles.
 
 Hermetic via ``aioclient_mock`` (HA's HTTP mock layer) — no live Traefik needed.
@@ -21,15 +21,15 @@ from unittest.mock import MagicMock
 import aiohttp
 import pytest
 
-from custom_components.traefik.api import TraefikApiClient, TraefikApiError
-from custom_components.traefik.config_flow import (
+from custom_components.traefik_proxy.api import TraefikProxyApiClient, TraefikProxyApiError
+from custom_components.traefik_proxy.config_flow import (
     STEP_USER_DATA_SCHEMA,
     STEP_YAML_DATA_SCHEMA,
     InvalidUrl,
     _check_url_shape,
     _validate_input,
 )
-from custom_components.traefik.const import (
+from custom_components.traefik_proxy.const import (
     CONF_API_KEY,
     CONF_URL,
     CONF_VERIFY_SSL,
@@ -106,7 +106,7 @@ def test_user_schema_serializes_for_config_flow_endpoint() -> None:
     import voluptuous_serialize
     from homeassistant.helpers import config_validation as cv
 
-    from custom_components.traefik.config_flow import STEP_USER_DATA_SCHEMA
+    from custom_components.traefik_proxy.config_flow import STEP_USER_DATA_SCHEMA
 
     serialized = voluptuous_serialize.convert(STEP_USER_DATA_SCHEMA, custom_serializer=cv.custom_serializer)
     assert isinstance(serialized, list)
@@ -197,8 +197,8 @@ async def test_validate_input_empty_bearer_does_not_send_authorization_header(
 
 
 async def test_api_get_classifies_invalid_url_client_error() -> None:
-    """``TraefikApiClient._get`` catches ``InvalidUrlClientError`` → ``TraefikApiError``."""
-    client = TraefikApiClient(
+    """``TraefikProxyApiClient._get`` catches ``InvalidUrlClientError`` → ``TraefikProxyApiError``."""
+    client = TraefikProxyApiClient(
         session=MagicMock(),
         base_url="http;//bad",
         api_key="",
@@ -206,5 +206,5 @@ async def test_api_get_classifies_invalid_url_client_error() -> None:
     bad_session = MagicMock()
     bad_session.get.side_effect = aiohttp.InvalidUrlClientError("http;//bad")
     client._session = bad_session
-    with pytest.raises(TraefikApiError):
+    with pytest.raises(TraefikProxyApiError):
         await client._get("/api/overview")

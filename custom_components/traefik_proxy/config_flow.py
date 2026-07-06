@@ -2,18 +2,18 @@
 
 Implements four flows against the Phase 1 probe-and-validate foundation:
 
-- :class:`TraefikConfigFlow.async_step_user` / ``async_step_yaml`` — initial
+- :class:`TraefikProxyConfigFlow.async_step_user` / ``async_step_yaml`` — initial
   setup (CFG-01 / CFG-02). Preserved byte-for-byte from Phase 1 so the
   integration tests against ``async_step_user`` keep passing.
-- :class:`TraefikOptionsFlow.async_step_init` — post-setup scan_interval /
+- :class:`TraefikProxyOptionsFlow.async_step_init` — post-setup scan_interval /
   verify_ssl / tls_warn_days knobs (CFG-05, CONTEXT.md D-09). Validates via
   ``vol.Range`` and aborts on out-of-range via the ``scan_interval_out_of_range``
   translation key.
-- :class:`TraefikConfigFlow.async_step_reauth` / ``async_step_reauth_confirm``
+- :class:`TraefikProxyConfigFlow.async_step_reauth` / ``async_step_reauth_confirm``
   — token rotation (CFG-04, CONTEXT.md D-10). Fires when the coordinator
   raises ``ConfigEntryAuthFailed``; the new bearer token is validated against
   ``/api/overview`` and the entry's data is updated in place + reloaded.
-- :class:`TraefikConfigFlow.async_step_reconfigure` — in-place URL + token
+- :class:`TraefikProxyConfigFlow.async_step_reconfigure` — in-place URL + token
   change (CFG-03, CONTEXT.md D-11). Pre-fills from ``entry.data``, validates,
   and calls ``async_update_reload_and_abort`` with ``data_updates``.
 """
@@ -43,7 +43,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from .api import TraefikApiClient, TraefikApiError, TraefikAuthError
+from .api import TraefikProxyApiClient, TraefikProxyApiError, TraefikProxyAuthError
 from .const import (
     CONF_API_KEY,
     CONF_SCAN_INTERVAL,
@@ -146,7 +146,7 @@ async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
     and everything-else -> CannotConnect mapping is defined exactly once.
     """
     _check_url_shape(data[CONF_URL])
-    client = TraefikApiClient(
+    client = TraefikProxyApiClient(
         session=async_get_clientsession(hass),
         base_url=data[CONF_URL],
         api_key=data.get(CONF_API_KEY, ""),
@@ -157,17 +157,17 @@ async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
             await client.get_overview()
     except InvalidUrlClientError as err:
         raise InvalidUrl(data[CONF_URL]) from err
-    except TraefikAuthError:
+    except TraefikProxyAuthError:
         raise InvalidAuth from None
     except ClientResponseError as err:
         if err.status == 404:
             raise ApiDisabled from err
         raise CannotConnect from err
-    except TimeoutError, ClientConnectorError, TraefikApiError:
+    except TimeoutError, ClientConnectorError, TraefikProxyApiError:
         raise CannotConnect from None
 
 
-class TraefikOptionsFlow(OptionsFlow):
+class TraefikProxyOptionsFlow(OptionsFlow):
     """Post-setup options flow (CFG-05, CONTEXT.md D-09).
 
     Exposes three knobs:
@@ -231,7 +231,7 @@ class TraefikOptionsFlow(OptionsFlow):
         )
 
 
-class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
+class TraefikProxyConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Traefik."""
 
     VERSION = 1
@@ -239,7 +239,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> TraefikOptionsFlow:
+    def async_get_options_flow(config_entry: ConfigEntry) -> TraefikProxyOptionsFlow:
         """Return the options flow handler (CFG-05 / CONTEXT.md D-09).
 
         The flow itself stores its values in ``entry.options``; the
@@ -247,7 +247,7 @@ class TraefikConfigFlow(ConfigFlow, domain=DOMAIN):
         new ``scan_interval`` to the running coordinator so the change is
         live (no integration reload required for interval tweaks).
         """
-        return TraefikOptionsFlow()
+        return TraefikProxyOptionsFlow()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the UI setup step."""

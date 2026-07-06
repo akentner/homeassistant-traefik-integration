@@ -15,7 +15,7 @@ Design contracts locked by CONTEXT.md and spike 004:
 - CONTEXT.md D-06 — in-memory ``dict[str, CertInfo | CertError]`` cache;
   errors are kept in the cache (not just successes) so a single
   transient failure does not erase the prior result on the next cycle.
-- CONTEXT.md D-07 — independent of the main ``TraefikCoordinator`` cycle;
+- CONTEXT.md D-07 — independent of the main ``TraefikProxyCoordinator`` cycle;
   a TLS failure on one hostname never marks the main coordinator as
   failed.
 - CONTEXT.md D-10 — every error path becomes a typed ``CertError`` and
@@ -61,7 +61,7 @@ class CertCoordinator(DataUpdateCoordinator[dict[str, CertInfo | CertError]]):
 
     Every cycle:
 
-    1. Reads the main ``TraefikCoordinator.data["http_routers"]`` cache
+    1. Reads the main ``TraefikProxyCoordinator.data["http_routers"]`` cache
        (no direct Traefik HTTP API call — main cycle already covers
        that at the 15s scan interval).
     2. Extracts the deduplicated union of hostnames from

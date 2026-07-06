@@ -1,6 +1,6 @@
-"""Unit tests for TraefikApiClient (no HA hass required; uses unittest.mock).
+"""Unit tests for TraefikProxyApiClient (no HA hass required; uses unittest.mock).
 
-TraefikApiClient has zero HA imports by design (Pitfall 3 mitigation), so the
+TraefikProxyApiClient has zero HA imports by design (Pitfall 3 mitigation), so the
 tests avoid HA fixtures too — pure aiohttp session, mocked at the session.get()
 level. Each test owns its mock and verifies the contract: status dispatch,
 header injection, error paths, no token leakage.
@@ -15,10 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from custom_components.traefik.api import (
-    TraefikApiClient,
-    TraefikApiError,
-    TraefikAuthError,
+from custom_components.traefik_proxy.api import (
+    TraefikProxyApiClient,
+    TraefikProxyApiError,
+    TraefikProxyAuthError,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -89,8 +89,8 @@ class _MockSession:
         return cm
 
 
-def _build_client(session: _MockSession, api_key: str = "k") -> TraefikApiClient:
-    return TraefikApiClient(session, BASE_URL, api_key=api_key)  # type: ignore[arg-type]
+def _build_client(session: _MockSession, api_key: str = "k") -> TraefikProxyApiClient:
+    return TraefikProxyApiClient(session, BASE_URL, api_key=api_key)  # type: ignore[arg-type]
 
 
 async def test_get_version_returns_parsed_json():
@@ -114,8 +114,8 @@ async def test_get_routers_returns_list():
 async def test_auth_error_on_401():
     session = _MockSession()
     session.queue("/api/overview", 401)
-    client = TraefikApiClient(session, BASE_URL, api_key="SECRET-DO-NOT-LOG")  # type: ignore[arg-type]
-    with pytest.raises(TraefikAuthError):
+    client = TraefikProxyApiClient(session, BASE_URL, api_key="SECRET-DO-NOT-LOG")  # type: ignore[arg-type]
+    with pytest.raises(TraefikProxyAuthError):
         await client.get_overview()
 
 
@@ -123,13 +123,13 @@ async def test_api_error_on_500():
     session = _MockSession()
     session.queue("/api/overview", 500)
     client = _build_client(session)
-    with pytest.raises(TraefikApiError) as exc:
+    with pytest.raises(TraefikProxyApiError) as exc:
         await client.get_overview()
-    assert not isinstance(exc.value, TraefikAuthError)
+    assert not isinstance(exc.value, TraefikProxyAuthError)
 
 
 async def test_api_error_on_timeout():
-    """Timeout errors are surfaced as TraefikApiError, not TraefikAuthError."""
+    """Timeout errors are surfaced as TraefikProxyApiError, not TraefikProxyAuthError."""
 
     class _TimeoutSession(_MockSession):
         def get(self, *_args, **_kwargs):
@@ -137,15 +137,15 @@ async def test_api_error_on_timeout():
 
     session = _TimeoutSession()
     client = _build_client(session)
-    with pytest.raises(TraefikApiError):
+    with pytest.raises(TraefikProxyApiError):
         await client.get_overview()
 
 
 async def test_token_never_logged(caplog):
     session = _MockSession()
     session.queue("/api/overview", 401)
-    client = TraefikApiClient(session, BASE_URL, api_key="ULTRA-SECRET")  # type: ignore[arg-type]
-    with pytest.raises(TraefikAuthError):
+    client = TraefikProxyApiClient(session, BASE_URL, api_key="ULTRA-SECRET")  # type: ignore[arg-type]
+    with pytest.raises(TraefikProxyAuthError):
         await client.get_overview()
     log_text = caplog.text
     assert "ULTRA-SECRET" not in log_text
@@ -153,7 +153,7 @@ async def test_token_never_logged(caplog):
 
 def test_no_client_session_in_api_module():
     """Pitfall #3 mitigation: production code never instantiates its own session."""
-    api_path = Path(__file__).parent.parent / "custom_components" / "traefik" / "api.py"
+    api_path = Path(__file__).parent.parent / "custom_components" / "traefik_proxy" / "api.py"
     text = api_path.read_text()
     for line in text.splitlines():
         if "aiohttp.ClientSession(" in line and "session: aiohttp.ClientSession" not in line:
@@ -163,7 +163,7 @@ def test_no_client_session_in_api_module():
 async def test_no_authorization_header_when_key_empty():
     session = _MockSession()
     session.queue("/api/version", 200, _load("traefik_version.json"))
-    client = TraefikApiClient(session, BASE_URL, api_key="")  # type: ignore[arg-type]
+    client = TraefikProxyApiClient(session, BASE_URL, api_key="")  # type: ignore[arg-type]
     await client.get_version()
     headers = session.calls[0][1]["headers"]
     assert headers == {}
@@ -172,6 +172,6 @@ async def test_no_authorization_header_when_key_empty():
 async def test_verify_ssl_passed_through():
     session = _MockSession()
     session.queue("/api/version", 200, _load("traefik_version.json"))
-    client = TraefikApiClient(session, BASE_URL, api_key="k", verify_ssl=False)  # type: ignore[arg-type]
+    client = TraefikProxyApiClient(session, BASE_URL, api_key="k", verify_ssl=False)  # type: ignore[arg-type]
     await client.get_version()
     assert session.calls[0][1]["ssl"] is False

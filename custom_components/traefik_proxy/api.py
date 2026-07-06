@@ -31,11 +31,11 @@ _LOGGER = logging.getLogger(__name__)
 _INTERNAL_ITEM_RE = re.compile(r"@internal$")
 
 
-class TraefikApiError(Exception):
+class TraefikProxyApiError(Exception):
     """Raised for non-auth Traefik API failures (5xx, network, parse)."""
 
 
-class TraefikAuthError(TraefikApiError):
+class TraefikProxyAuthError(TraefikProxyApiError):
     """Raised on 401/403 — caller maps to ConfigEntryAuthFailed."""
 
 
@@ -62,7 +62,7 @@ def filter_internal_items(
     return [item for item in items if not _INTERNAL_ITEM_RE.search(str(item.get(name_key, "")))]
 
 
-class TraefikApiClient:
+class TraefikProxyApiClient:
     """Async client for Traefik's HTTP API (v2.11+ / v3.x)."""
 
     def __init__(
@@ -97,16 +97,16 @@ class TraefikApiClient:
                 ) as response:
                     _LOGGER.debug("path=%s status=%s", path, response.status)
                     if response.status in (401, 403):
-                        raise TraefikAuthError(f"Auth failed for {path}: {response.status}")
+                        raise TraefikProxyAuthError(f"Auth failed for {path}: {response.status}")
                     response.raise_for_status()
                     return await response.json(content_type=None)
         except aiohttp.ClientResponseError as err:
             # raise_for_status already raised; re-classify for safety
             if err.status in (401, 403):
-                raise TraefikAuthError(str(err)) from err
-            raise TraefikApiError(str(err)) from err
+                raise TraefikProxyAuthError(str(err)) from err
+            raise TraefikProxyApiError(str(err)) from err
         except (TimeoutError, aiohttp.ClientConnectorError, aiohttp.InvalidUrlClientError) as err:
-            raise TraefikApiError(str(err)) from err
+            raise TraefikProxyApiError(str(err)) from err
 
     # --- Read endpoints ---
     async def get_version(self) -> dict[str, Any]:
@@ -149,8 +149,8 @@ class TraefikApiClient:
     async def reload_routers(self) -> None:
         """POST /api/http/routers/refresh — ask Traefik to reload routers.
 
-        Returns ``None`` on 2xx. Raises ``TraefikAuthError`` on 401/403 and
-        ``TraefikApiError`` on other non-2xx. Does NOT poll — the reload
+        Returns ``None`` on 2xx. Raises ``TraefikProxyAuthError`` on 401/403 and
+        ``TraefikProxyApiError`` on other non-2xx. Does NOT poll — the reload
         service handler (plan 02-04) is responsible for verifying that the
         reload actually completed (CONTEXT.md D-05/D-12).
 
@@ -169,15 +169,15 @@ class TraefikApiClient:
                 ) as response:
                     _LOGGER.debug("path=%s status=%s", "/api/http/routers/refresh", response.status)
                     if response.status in (401, 403):
-                        raise TraefikAuthError(f"Auth failed for /api/http/routers/refresh: {response.status}")
+                        raise TraefikProxyAuthError(f"Auth failed for /api/http/routers/refresh: {response.status}")
                     response.raise_for_status()
                     return None
         except aiohttp.ClientResponseError as err:
             if err.status in (401, 403):
-                raise TraefikAuthError(str(err)) from err
-            raise TraefikApiError(str(err)) from err
+                raise TraefikProxyAuthError(str(err)) from err
+            raise TraefikProxyApiError(str(err)) from err
         except (TimeoutError, aiohttp.ClientConnectorError, aiohttp.InvalidUrlClientError) as err:
-            raise TraefikApiError(str(err)) from err
+            raise TraefikProxyApiError(str(err)) from err
 
     # --- Aggregated fetch ---
     async def fetch_all(self) -> dict[str, Any]:
@@ -202,7 +202,7 @@ class TraefikApiClient:
         )
         # Auth failures always win — never swallow them (PITFALLS).
         for result in (version, entrypoints, http_routers, http_services, http_middlewares, overview):
-            if isinstance(result, TraefikAuthError):
+            if isinstance(result, TraefikProxyAuthError):
                 raise result
         # First non-auth exception wins (CONTEXT.md D-07).
         first_exc = next(

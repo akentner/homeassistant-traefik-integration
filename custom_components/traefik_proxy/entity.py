@@ -8,7 +8,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_NAME, DOMAIN
-from .coordinator import TraefikConfigEntry, TraefikCoordinator
+from .coordinator import TraefikProxyConfigEntry, TraefikProxyCoordinator
 
 if TYPE_CHECKING:
     pass
@@ -36,7 +36,7 @@ def _category_to_model(category: str) -> str:
     return _CATEGORY_TO_MODEL.get(category, category)
 
 
-class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
+class TraefikProxyEntity(CoordinatorEntity[TraefikProxyCoordinator]):
     """Common base for all Traefik entities (binary_sensor, sensor, button).
 
     Each entity registers under a per-category HA device — the integration
@@ -52,7 +52,7 @@ class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
+        entry: TraefikProxyConfigEntry,
         category: str,
         *,
         description_key: str | None = None,
@@ -70,7 +70,7 @@ class TraefikEntity(CoordinatorEntity[TraefikCoordinator]):
     def device_info(self) -> DeviceInfo:
         url_host = self._url_host()
         model = _category_to_model(self._category)
-        name = f"{url_host} Traefik \u2014 {model}" if url_host else f"{DEFAULT_NAME} \u2014 {model}"
+        name = f"{url_host} Traefik Proxy \u2014 {model}" if url_host else f"{DEFAULT_NAME} \u2014 {model}"
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._entry.entry_id}_{self._category}")},
             manufacturer="Traefik",

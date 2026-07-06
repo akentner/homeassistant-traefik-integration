@@ -4,8 +4,8 @@ Covers:
 - module-level async_setup registers traefik.reload_routers
 - service handler returns verified=True when router set changes
 - service handler returns verified=False after budget exhaustion
-- service handler propagates TraefikApiError on non-2xx POST
-- TraefikReloadButton.async_press dispatches through the service
+- service handler propagates TraefikProxyApiError on non-2xx POST
+- TraefikProxyReloadButton.async_press dispatches through the service
 
 Hermetic — uses aioclient_mock + AsyncMock for client.reload_routers so the
 tests don't depend on a live Traefik instance or the 5s polling budget
@@ -20,9 +20,9 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.traefik.api import TraefikApiError
-from custom_components.traefik.button import TraefikReloadButton
-from custom_components.traefik.const import DOMAIN
+from custom_components.traefik_proxy.api import TraefikProxyApiError
+from custom_components.traefik_proxy.button import TraefikProxyReloadButton
+from custom_components.traefik_proxy.const import DOMAIN
 
 MOCK_URL = "https://traefik.example.com:8080"
 
@@ -79,7 +79,7 @@ def _stub_all_endpoints(
 
 async def test_async_setup_registers_reload_service(hass) -> None:
     """Module-level async_setup registers traefik.reload_routers (PITFALLS M5)."""
-    from custom_components.traefik import async_setup
+    from custom_components.traefik_proxy import async_setup
 
     assert await async_setup(hass, {}) is True
     assert hass.services.has_service(DOMAIN, "reload_routers")
@@ -87,7 +87,7 @@ async def test_async_setup_registers_reload_service(hass) -> None:
 
 async def test_reload_service_verified_true_when_routers_change(hass, aioclient_mock) -> None:
     """Reload handler: router set changes -> verified=True with name_diff."""
-    from custom_components.traefik import _async_handle_reload_routers
+    from custom_components.traefik_proxy import _async_handle_reload_routers
 
     # Initial cycle: routers A and B.
     initial_routers = [
@@ -147,7 +147,7 @@ async def test_reload_service_verified_true_when_routers_change(hass, aioclient_
 
 async def test_reload_service_verified_false_when_no_change_within_budget(hass, aioclient_mock) -> None:
     """If router set never changes, verified=False after max attempts."""
-    from custom_components.traefik import _async_handle_reload_routers
+    from custom_components.traefik_proxy import _async_handle_reload_routers
 
     routers = [
         {"name": "stable-router", "rule": "Host(`s.example.com`)", "status": "enabled"},
@@ -181,11 +181,11 @@ async def test_reload_service_verified_false_when_no_change_within_budget(hass, 
 
 
 async def test_reload_service_propagates_api_errors(hass, aioclient_mock) -> None:
-    """Non-2xx POST raises TraefikApiError -> HA surfaces as service failure."""
-    from custom_components.traefik import _async_handle_reload_routers
+    """Non-2xx POST raises TraefikProxyApiError -> HA surfaces as service failure."""
+    from custom_components.traefik_proxy import _async_handle_reload_routers
 
     _stub_all_endpoints(aioclient_mock)
-    # POST returns 500 -> reload_routers raises TraefikApiError.
+    # POST returns 500 -> reload_routers raises TraefikProxyApiError.
     aioclient_mock.post(f"{MOCK_URL}/api/http/routers/refresh", status=500)
 
     entry = _make_entry()
@@ -196,12 +196,12 @@ async def test_reload_service_propagates_api_errors(hass, aioclient_mock) -> Non
     # No need to stub reload_routers — the real client will hit the mocked POST.
 
     call = _make_service_call(hass)
-    with pytest.raises(TraefikApiError):
+    with pytest.raises(TraefikProxyApiError):
         await _async_handle_reload_routers(call)
 
 
 async def test_reload_button_async_press_calls_service(hass, aioclient_mock) -> None:
-    """TraefikReloadButton.async_press dispatches via hass.services.async_call.
+    """TraefikProxyReloadButton.async_press dispatches via hass.services.async_call.
 
     Proof of dispatch chain (button -> service -> handler -> client):
     1. Replace ``coordinator.client.reload_routers`` with an AsyncMock spy.
@@ -219,7 +219,7 @@ async def test_reload_button_async_press_calls_service(hass, aioclient_mock) -> 
     entry = _make_entry()
     entry.add_to_hass(hass)
     # Register the service (module-level setup hasn't fired in tests — call it).
-    from custom_components.traefik import async_setup
+    from custom_components.traefik_proxy import async_setup
 
     await async_setup(hass, {})
 
@@ -238,7 +238,7 @@ async def test_reload_button_async_press_calls_service(hass, aioclient_mock) -> 
         return_value=None
     )
 
-    button = TraefikReloadButton(hass, entry, coordinator)
+    button = TraefikProxyReloadButton(hass, entry, coordinator)
     await button.async_press()
     await hass.async_block_till_done()
 

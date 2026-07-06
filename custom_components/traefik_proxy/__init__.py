@@ -23,7 +23,7 @@ from .const import (
     DOMAIN,
     PLATFORMS,
 )
-from .coordinator import TraefikConfigEntry, TraefikCoordinator
+from .coordinator import TraefikProxyConfigEntry, TraefikProxyCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ async def _async_handle_reload_routers(call: ServiceCall) -> dict[str, Any]:
     Returns: ``{verified: bool, elapsed_ms: int, attempts: int, name_diff:
     {"added": [...], "removed": [...]}}``.
 
-    Non-2xx POSTs raise ``TraefikApiError`` -> HA surfaces the service-call
+    Non-2xx POSTs raise ``TraefikProxyApiError`` -> HA surfaces the service-call
     failure to the caller. When no Traefik config entry is loaded (shouldn't
     happen for a sane HA install), we raise ``HomeAssistantError`` so HA's
     service UI shows a clear error rather than silently no-op'ing.
@@ -73,7 +73,7 @@ async def _async_handle_reload_routers(call: ServiceCall) -> dict[str, Any]:
     ]
     if not coordinators:
         raise HomeAssistantError("No loaded Traefik config entry to reload against")
-    coordinator: TraefikCoordinator = coordinators[0]
+    coordinator: TraefikProxyCoordinator = coordinators[0]
 
     def _current_router_names() -> set[str]:
         """Snapshot of router names from the latest coordinator cycle."""
@@ -85,7 +85,7 @@ async def _async_handle_reload_routers(call: ServiceCall) -> dict[str, Any]:
 
     before = _current_router_names()
 
-    # Trigger the refresh. Raises TraefikApiError -> HA surfaces as
+    # Trigger the refresh. Raises TraefikProxyApiError -> HA surfaces as
     # service-call failure (the caller sees the error in the trace log).
     await coordinator.client.reload_routers()
 
@@ -157,7 +157,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: TraefikConfigEntry) -> None:
+async def _async_options_updated(hass: HomeAssistant, entry: TraefikProxyConfigEntry) -> None:
     """Apply Options changes to the running coordinator (CONTEXT.md D-08).
 
     Options Flow writes the new scan_interval / verify_ssl / tls_warn_days
@@ -169,7 +169,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: TraefikConfigEntry)
     by re-running ``async_setup_entry`` with the new URL, which rebuilds
     the API client + coordinator from scratch.
     """
-    coordinator: TraefikCoordinator = entry.runtime_data
+    coordinator: TraefikProxyCoordinator = entry.runtime_data
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator.update_interval = timedelta(seconds=scan_interval)
     _LOGGER.debug(
@@ -194,12 +194,12 @@ async def _async_options_updated(hass: HomeAssistant, entry: TraefikConfigEntry)
             )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: TraefikProxyConfigEntry) -> bool:
     """Set up Traefik from a config entry.
 
     Order matters (CONTEXT.md D-05/D-10):
 
-    1. Build main ``TraefikCoordinator`` and await its first refresh —
+    1. Build main ``TraefikProxyCoordinator`` and await its first refresh —
        first_refresh raises ``ConfigEntryNotReady`` on transient failure,
        or ``ConfigEntryAuthFailed`` on 401/403 (auto-retried by HA on
        NotReady, or surfaced to the reauth flow on AuthFailed).
@@ -214,7 +214,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> b
        see a defined state instead of awaiting an unfinished refresh.
     5. Forward platforms (sensor, binary_sensor, button).
     """
-    coordinator = TraefikCoordinator(hass, entry)
+    coordinator = TraefikProxyCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
@@ -258,7 +258,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> b
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: TraefikConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: TraefikProxyConfigEntry) -> bool:
     """Unload a Traefik config entry.
 
     HA removes the update listener automatically as part of entry unload,

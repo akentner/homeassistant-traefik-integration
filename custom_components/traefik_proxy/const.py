@@ -2,7 +2,7 @@
 
 from typing import Final
 
-DOMAIN: Final = "traefik"
+DOMAIN: Final = "traefik_proxy"
 
 # Configuration keys (entry.data)
 CONF_URL: Final = "url"
@@ -14,7 +14,7 @@ CONF_TLS_WARN_DAYS: Final = "tls_warn_days"
 # Defaults
 DEFAULT_VERIFY_SSL: Final = True
 DEFAULT_SCAN_INTERVAL: Final = 15  # seconds (CONTEXT.md D-12)
-DEFAULT_NAME: Final = "Traefik"
+DEFAULT_NAME: Final = "Traefik Proxy"
 
 # Clamps for Options Flow (Phase 2 — Plan 02-02 fills these in).
 # MIN_SCAN_INTERVAL/MAX_SCAN_INTERVAL bound the scan-interval knob

@@ -1,7 +1,7 @@
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**Home Assistant Traefik Integration**
+**Home Assistant Traefik Proxy Integration**
 
 A custom Home Assistant integration that connects to a Traefik reverse proxy
 and surfaces its operational state inside Home Assistant — routers, services,
@@ -61,7 +61,7 @@ and which TLS certificates are expiring soon.
 ### `hacs.json` (repository root)
 | Field | Value | Rationale |
 |-------|-------|-----------|
-| `name` | `"Traefik"` | Display name in HACS UI. Required. |
+| `name` | `"Traefik Proxy"` | Display name in HACS UI. Required. |
 | `homeassistant` | `"2025.4.0"` | Matches PROJECT.md mandate; HACS will refuse older installs. |
 | `hacs` | `"2.0.5"` | Current HACS minimum as of 2025; matches `gatus` integration. |
 | **No `filename` / `zip_release`** | — | Standard folder-based distribution; HACS will read `custom_components/traefik/`. |
@@ -75,7 +75,7 @@ and which TLS certificates are expiring soon.
 | `ConfigFlow` | `homeassistant.config_entries` | UI setup wizard (CORE-01) | Subclass; `domain=` class keyword. |
 | `OptionsFlow` | `homeassistant.config_entries` | Re-configure interval & TLS warning threshold (CFG-01) | Bound via `entry.add_update_listener`. |
 | `SensorEntity` / `BinarySensorEntity` | `homeassistant.components.{sensor,binary_sensor}` | Entity base classes | Standard. |
-| `DeviceInfo` | `homeassistant.helpers.device_registry` | Group entities under one "Traefik" device | Traefik is the device; routers/entrypoints are entities. |
+| `DeviceInfo` | `homeassistant.helpers.device_registry` | Group entities under one "Traefik Proxy" device | Traefik is the device; routers/entrypoints are entities. |
 | `DeviceEntryType.SERVICE` | `homeassistant.helpers.device_registry` | Marker for service-type devices | Recommended since `integration_type: "service"`. |
 | `async_get_clientsession` | `homeassistant.helpers.aiohttp_client` | Shared aiohttp session | **Always** use this; never create `aiohttp.ClientSession()` yourself. |
 | `ConfigEntryNotReady` | `homeassistant.exceptions` | First-refresh failure → HA auto-retries | For transient errors only. |
@@ -231,10 +231,10 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 
 
 
-<!-- GSD:skill-routing-start source:.claude/skills/spike-findings-homeassistant-traefik-integration/SKILL.md -->
+<!-- GSD:skill-routing-start source:.claude/skills/spike-findings-homeassistant-traefik-proxy-integration/SKILL.md -->
 ## Skill Auto-Routing
 
-- **TLS handshake patterns (stdlib ssl + socket, SNI routing, notAfter parsing, async wrapping)** → `Skill("spike-findings-homeassistant-traefik-integration")` (loaded automatically during Phase 3 work)
+- **TLS handshake patterns (stdlib ssl + socket, SNI routing, notAfter parsing, async wrapping)** → `Skill("spike-findings-homeassistant-traefik-proxy-integration")` (loaded automatically during Phase 3 work)
 <!-- GSD:skill-routing-end -->
 
 

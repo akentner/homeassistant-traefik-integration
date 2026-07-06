@@ -1,6 +1,6 @@
 """CertCoordinator tests — Phase 3 lifecycle invariants (TEST-04 + D-05/D-08/D-10).
 
-Covers the data-path invariants of ``custom_components.traefik.cert_coordinator.CertCoordinator``:
+Covers the data-path invariants of ``custom_components.traefik_proxy.cert_coordinator.CertCoordinator``:
 
 - Semaphore-bounded concurrent probes (CONTEXT.md D-05).
 - Per-host ``asyncio.timeout(5)`` graceful error path (D-10 — never raises).
@@ -26,17 +26,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.traefik.cert_coordinator import (
+from custom_components.traefik_proxy.cert_coordinator import (
     _HOST_FROM_RULE,
     CertCoordinator,
 )
-from custom_components.traefik.const import (
+from custom_components.traefik_proxy.const import (
     DEFAULT_TLS_CERT_COOLDOWN,
     DEFAULT_TLS_WARN_DAYS,
     TLS_HANDSHAKE_TIMEOUT,
     TLS_SEMAPHORE,
 )
-from custom_components.traefik.tls import CertError, CertInfo, is_error
+from custom_components.traefik_proxy.tls import CertError, CertInfo, is_error
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -178,7 +178,7 @@ async def test_probe_returns_certerror_on_timeout() -> None:
     c = CertCoordinator(MagicMock(), _make_entry())
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
-            "custom_components.traefik.cert_coordinator.fetch_cert_info_async",
+            "custom_components.traefik_proxy.cert_coordinator.fetch_cert_info_async",
             AsyncMock(side_effect=TimeoutError()),
         )
         result = await c._probe("example.com")
@@ -200,7 +200,7 @@ async def test_probe_catches_generic_exception() -> None:
     c = CertCoordinator(MagicMock(), _make_entry())
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
-            "custom_components.traefik.cert_coordinator.fetch_cert_info_async",
+            "custom_components.traefik_proxy.cert_coordinator.fetch_cert_info_async",
             AsyncMock(side_effect=RuntimeError("boom")),
         )
         result = await c._probe("example.com")
@@ -285,7 +285,7 @@ async def test_async_update_data_fans_out_via_gather() -> None:
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
-            "custom_components.traefik.cert_coordinator.fetch_cert_info_async",
+            "custom_components.traefik_proxy.cert_coordinator.fetch_cert_info_async",
             AsyncMock(side_effect=fake_probe),
         )
         data = await c._async_update_data()
@@ -335,7 +335,7 @@ async def test_async_update_data_handles_error_rows_mixing_in_success() -> None:
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
-            "custom_components.traefik.cert_coordinator.fetch_cert_info_async",
+            "custom_components.traefik_proxy.cert_coordinator.fetch_cert_info_async",
             AsyncMock(side_effect=fake_probe),
         )
         data = await c._async_update_data()

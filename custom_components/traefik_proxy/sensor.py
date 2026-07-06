@@ -1,15 +1,15 @@
 """Sensor entities for the Traefik integration.
 
-Phase 2 plan 02-03 fills this out with `TraefikEntrypointSensor`,
-`TraefikServiceSensor`, and the three aggregate count sensors on the Overview
+Phase 2 plan 02-03 fills this out with `TraefikProxyEntrypointSensor`,
+`TraefikProxyServiceSensor`, and the three aggregate count sensors on the Overview
 device (CONTEXT.md D-15/D-16/D-17).
 
 Entity count per config entry (after `async_setup_entry` returns):
-- 1 per `TraefikEntrypointSensor` per Traefik entrypoint (HTTP Entrypoints device)
-- 1 per `TraefikServiceSensor` per Traefik service (HTTP Services device;
+- 1 per `TraefikProxyEntrypointSensor` per Traefik entrypoint (HTTP Entrypoints device)
+- 1 per `TraefikProxyServiceSensor` per Traefik service (HTTP Services device;
   provider internal `api@internal` is filtered out via `filter_internal_items`)
-- 1 each of `TraefikRoutersCountSensor`, `TraefikServicesCountSensor`,
-  `TraefikMiddlewaresCountSensor` on the Overview device
+- 1 each of `TraefikProxyRoutersCountSensor`, `TraefikProxyServicesCountSensor`,
+  `TraefikProxyMiddlewaresCountSensor` on the Overview device
 """
 
 from __future__ import annotations
@@ -23,19 +23,19 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 
 from .api import filter_internal_items
-from .entity import TraefikEntity
+from .entity import TraefikProxyEntity
 from .tls import CertError, CertInfo, is_error
 
 if TYPE_CHECKING:
     from .cert_coordinator import CertCoordinator
-    from .coordinator import TraefikConfigEntry, TraefikCoordinator
+    from .coordinator import TraefikProxyConfigEntry, TraefikProxyCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: Any,
-    entry: TraefikConfigEntry,
+    entry: TraefikProxyConfigEntry,
     async_add_entities: Any,
 ) -> None:
     """Set up Traefik sensor entities for a config entry.
@@ -46,7 +46,7 @@ async def async_setup_entry(
     (any key missing -> empty list) so we defensively coerce via the
     ``_dict_or_empty`` / ``_list_or_empty`` helpers below.
     """
-    coordinator: TraefikCoordinator = entry.runtime_data
+    coordinator: TraefikProxyCoordinator = entry.runtime_data
     data = _dict_or_empty(coordinator.data)
 
     # Per-entrypoint sensors (CONTEXT.md D-15).
@@ -54,22 +54,22 @@ async def async_setup_entry(
     # names like `websecure@internal` are first-class configuration objects the
     # user expects to see.
     entrypoints: list[dict[str, Any]] = _list_or_empty(data.get("entrypoints"))
-    entrypoint_entities = [TraefikEntrypointSensor(entry, coordinator, ep) for ep in entrypoints]
+    entrypoint_entities = [TraefikProxyEntrypointSensor(entry, coordinator, ep) for ep in entrypoints]
 
     # Per-service sensors (CONTEXT.md D-16). Filter `@<provider>` internal items
     # via the canonical helper in api.py (CONTEXT.md D-06).
     services = filter_internal_items(_list_or_empty(data.get("http_services")))
-    service_entities = [TraefikServiceSensor(entry, coordinator, svc) for svc in services]
+    service_entities = [TraefikProxyServiceSensor(entry, coordinator, svc) for svc in services]
 
     # Aggregate counters on the Overview device (CONTEXT.md D-17). The
     # sensors compute their state and breakdown attributes lazily from
     # ``coordinator.data`` on every property access (see
-    # ``_TraefikAggregateCountSensor`` docstring for the v0.1.4 fix) —
+    # ``_TraefikProxyAggregateCountSensor`` docstring for the v0.1.4 fix) —
     # no per-construction count kwargs needed.
     aggregate_entities = [
-        TraefikRoutersCountSensor(entry),
-        TraefikServicesCountSensor(entry),
-        TraefikMiddlewaresCountSensor(entry),
+        TraefikProxyRoutersCountSensor(entry),
+        TraefikProxyServicesCountSensor(entry),
+        TraefikProxyMiddlewaresCountSensor(entry),
     ]
 
     async_add_entities(entrypoint_entities + service_entities + aggregate_entities)
@@ -109,7 +109,7 @@ async def async_setup_entry(
             cache = cert_coordinator.data
             if not isinstance(cache, dict) or not cache:
                 return
-            new_entities: list[TraefikCertTimestampSensor] = []
+            new_entities: list[TraefikProxyCertTimestampSensor] = []
             for host, cache_value in cache.items():
                 host = host.lower()
                 # Only timestamp sensors go on ``CertInfo`` rows. Error
@@ -120,7 +120,7 @@ async def async_setup_entry(
                 # Type narrowing: ``is_error`` returned False so
                 # ``cache_value`` is a ``CertInfo`` dataclass.
                 info: CertInfo = cache_value  # type: ignore[assignment]
-                new_entities.append(TraefikCertTimestampSensor(entry, cert_coordinator, host, info))
+                new_entities.append(TraefikProxyCertTimestampSensor(entry, cert_coordinator, host, info))
             if new_entities:
                 async_add_entities(new_entities)
 
@@ -216,7 +216,7 @@ async def async_setup_entry(
 def _dict_or_empty(value: Any) -> dict[str, Any]:
     """Coerce an arbitrary value to ``dict[str, Any]`` (``{}`` on absence/bad type).
 
-    Used to consume ``TraefikData`` TypedDict (total=False) keys safely
+    Used to consume ``TraefikProxyData`` TypedDict (total=False) keys safely
     under ``mypy --strict`` — every key is ``None`` at the type level, so
     chaining ``.get(...)`` on the raw value triggers ``union-attr`` errors.
     """
@@ -287,7 +287,7 @@ def _count_by_status(
     return counts
 
 
-class TraefikEntrypointSensor(TraefikEntity, SensorEntity):
+class TraefikProxyEntrypointSensor(TraefikProxyEntity, SensorEntity):
     """One sensor per Traefik HTTP entrypoint (CONTEXT.md D-15).
 
     State = ``entrypoint["address"]`` (e.g., ``":443"``); attributes expose the
@@ -299,8 +299,8 @@ class TraefikEntrypointSensor(TraefikEntity, SensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
         entrypoint: dict[str, Any],
     ) -> None:
         entrypoint_name = entrypoint.get("name") or "unknown"
@@ -329,7 +329,7 @@ class TraefikEntrypointSensor(TraefikEntity, SensorEntity):
             "address": ep.get("address"),
             "transport": ep.get("transport"),
             # ``entrypoint_name`` mirrors ``name`` for consistency with the
-            # ``router_name`` alias on TraefikRouterBinarySensor (Phase 1
+            # ``router_name`` alias on TraefikProxyRouterBinarySensor (Phase 1
             # ROUTER-02 contract pin).
             "entrypoint_name": ep.get("name"),
         }
@@ -339,7 +339,7 @@ class TraefikEntrypointSensor(TraefikEntity, SensorEntity):
         return self.coordinator.last_update_success
 
 
-class TraefikServiceSensor(TraefikEntity, SensorEntity):
+class TraefikProxyServiceSensor(TraefikProxyEntity, SensorEntity):
     """One sensor per Traefik HTTP service (CONTEXT.md D-16).
 
     State = ``loadbalancer.status`` when present, else ``service.status``.
@@ -351,8 +351,8 @@ class TraefikServiceSensor(TraefikEntity, SensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
         service: dict[str, Any],
     ) -> None:
         service_name = service.get("name") or "unknown"
@@ -402,7 +402,7 @@ class TraefikServiceSensor(TraefikEntity, SensorEntity):
         return self.coordinator.last_update_success
 
 
-class _TraefikAggregateCountSensor(TraefikEntity, SensorEntity):
+class _TraefikProxyAggregateCountSensor(TraefikProxyEntity, SensorEntity):
     """Shared base for the three Overview device aggregate counters.
 
     State and breakdown attributes are **properties** that recompute from
@@ -439,7 +439,7 @@ class _TraefikAggregateCountSensor(TraefikEntity, SensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
+        entry: TraefikProxyConfigEntry,
         *,
         unique_id: str,
         entity_id: str,
@@ -508,7 +508,7 @@ class _TraefikAggregateCountSensor(TraefikEntity, SensorEntity):
         return attrs
 
 
-class TraefikRoutersCountSensor(_TraefikAggregateCountSensor):
+class TraefikProxyRoutersCountSensor(_TraefikProxyAggregateCountSensor):
     """Total Traefik routers — filtered count (CONTEXT.md D-17).
 
     State = ``len(filter_internal_items(coordinator.data["http_routers"]))``;
@@ -518,7 +518,7 @@ class TraefikRoutersCountSensor(_TraefikAggregateCountSensor):
     _DATA_KEY = "http_routers"
     _OVERVIEW_KEY = "routers"
 
-    def __init__(self, entry: TraefikConfigEntry) -> None:
+    def __init__(self, entry: TraefikProxyConfigEntry) -> None:
         super().__init__(
             entry,
             unique_id=f"{entry.entry_id}_overview_routers_count",
@@ -527,13 +527,13 @@ class TraefikRoutersCountSensor(_TraefikAggregateCountSensor):
         )
 
 
-class TraefikServicesCountSensor(_TraefikAggregateCountSensor):
+class TraefikProxyServicesCountSensor(_TraefikProxyAggregateCountSensor):
     """Total Traefik services — filtered count (CONTEXT.md D-17)."""
 
     _DATA_KEY = "http_services"
     _OVERVIEW_KEY = "services"
 
-    def __init__(self, entry: TraefikConfigEntry) -> None:
+    def __init__(self, entry: TraefikProxyConfigEntry) -> None:
         super().__init__(
             entry,
             unique_id=f"{entry.entry_id}_overview_services_count",
@@ -542,7 +542,7 @@ class TraefikServicesCountSensor(_TraefikAggregateCountSensor):
         )
 
 
-class TraefikMiddlewaresCountSensor(_TraefikAggregateCountSensor):
+class TraefikProxyMiddlewaresCountSensor(_TraefikProxyAggregateCountSensor):
     """Total Traefik middlewares — filtered count (CONTEXT.md D-17).
 
     Middlewares are HTTP-only per Traefik's API surface (no TCP/UDP
@@ -553,7 +553,7 @@ class TraefikMiddlewaresCountSensor(_TraefikAggregateCountSensor):
     _OVERVIEW_KEY = ""  # unused — overridden by _HAS_OVERVIEW_BREAKDOWN = False
     _HAS_OVERVIEW_BREAKDOWN = False
 
-    def __init__(self, entry: TraefikConfigEntry) -> None:
+    def __init__(self, entry: TraefikProxyConfigEntry) -> None:
         super().__init__(
             entry,
             unique_id=f"{entry.entry_id}_overview_middlewares_count",
@@ -562,7 +562,7 @@ class TraefikMiddlewaresCountSensor(_TraefikAggregateCountSensor):
         )
 
 
-class TraefikCertTimestampSensor(TraefikEntity, SensorEntity):
+class TraefikProxyCertTimestampSensor(TraefikProxyEntity, SensorEntity):
     """One timestamp sensor per TLS-probed hostname (TLS-01).
 
     Surfaces the leaf cert's ``notAfter`` datetime via HA's standard
@@ -584,7 +584,7 @@ class TraefikCertTimestampSensor(TraefikEntity, SensorEntity):
     the entity's ``extra_state_attributes`` — even when the cert probe
     failed and the entity is unavailable — so dashboards consistently
     show the countdown attribute. The same field is mirrored on the
-    paired ``TraefikCertExpiryBinarySensor`` for the ``is_on`` threshold
+    paired ``TraefikProxyCertExpiryBinarySensor`` for the ``is_on`` threshold
     comparison; both entities read from the SAME cache row so they
     never disagree about the underlying cert state.
 
@@ -607,7 +607,7 @@ class TraefikCertTimestampSensor(TraefikEntity, SensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
+        entry: TraefikProxyConfigEntry,
         coordinator: CertCoordinator,
         host: str,
         info: CertInfo,
@@ -651,7 +651,7 @@ class TraefikCertTimestampSensor(TraefikEntity, SensorEntity):
 
         SUGGESTION #1 fix — the helper is the single source of truth for
         cache availability so the timestamp sensor can never show
-        "unavailable" while the paired ``TraefikCertExpiryBinarySensor``
+        "unavailable" while the paired ``TraefikProxyCertExpiryBinarySensor``
         for the same host still shows a stale "ON". Both platforms
         consult this same function; the alternative — a duplicate
         per-platform helper — would inevitably drift out of sync.
@@ -710,7 +710,7 @@ def _cert_cache_availability(coordinator: CertCoordinator, host: str) -> bool:
        is not present, the entity should be unavailable so the user
        sees "unavailable" instead of a stale timestamp.
 
-    The paired ``TraefikCertExpiryBinarySensor`` imports this helper
+    The paired ``TraefikProxyCertExpiryBinarySensor`` imports this helper
     directly (``from .sensor import _cert_cache_availability``) — NO
     duplicate helper exists in ``binary_sensor.py``.
     """

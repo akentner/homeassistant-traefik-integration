@@ -14,13 +14,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 
 from .api import filter_internal_items
-from .entity import TraefikEntity
+from .entity import TraefikProxyEntity
 from .sensor import _cert_cache_availability
 from .tls import CertError, CertInfo, is_error
 
 if TYPE_CHECKING:
     from .cert_coordinator import CertCoordinator
-    from .coordinator import TraefikConfigEntry, TraefikCoordinator
+    from .coordinator import TraefikProxyConfigEntry, TraefikProxyCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,37 +37,37 @@ def _friendly_rule(rule: str | None) -> str | None:
 
 async def async_setup_entry(
     hass: Any,
-    entry: TraefikConfigEntry,
+    entry: TraefikProxyConfigEntry,
     async_add_entities: Any,
 ) -> None:
     """Set up Traefik binary sensors for a config entry.
 
-    Creates one ``TraefikRouterBinarySensor`` per user-visible Traefik HTTP
+    Creates one ``TraefikProxyRouterBinarySensor`` per user-visible Traefik HTTP
     router (CONTEXT.md D-06 / Phase 1 ROUTER-01) PLUS three aggregate
     binary sensors on the Diagnostics device (CONTEXT.md D-14/D-19):
 
-    - ``TraefikAnyRouterFailingBinarySensor``
-    - ``TraefikAnyServiceFailingBinarySensor`` (v0.2.0)
-    - ``TraefikAnyMiddlewareFailingBinarySensor`` (v0.2.0)
+    - ``TraefikProxyAnyRouterFailingBinarySensor``
+    - ``TraefikProxyAnyServiceFailingBinarySensor`` (v0.2.0)
+    - ``TraefikProxyAnyMiddlewareFailingBinarySensor`` (v0.2.0)
 
     All aggregates are single instance per config entry — never deleted;
     if the relevant list disappears the sensor falls to OFF (no items
     failing) and stays.
     """
-    coordinator: TraefikCoordinator = entry.runtime_data
+    coordinator: TraefikProxyCoordinator = entry.runtime_data
 
     # Phase 2: read `http_routers` (was `routers` in Phase 1 — fetch_all now
     # returns the renamed key per CONTEXT.md D-04). filter_internal_items is
     # the canonical helper from api.py (replaces _filter_user_routers).
     routers = filter_internal_items(coordinator.data.get("http_routers") or [])
-    router_entities = [TraefikRouterBinarySensor(entry, coordinator, router) for router in routers]
-    any_failing_entity = TraefikAnyRouterFailingBinarySensor(entry, coordinator)
+    router_entities = [TraefikProxyRouterBinarySensor(entry, coordinator, router) for router in routers]
+    any_failing_entity = TraefikProxyAnyRouterFailingBinarySensor(entry, coordinator)
     # v0.2.0: parallel aggregates for services + middlewares so users get
     # the same any-X-failing alarm pattern across all three Traefik
     # categories. Single-instance (D-19), PROBLEM device_class, opt-in
     # (entity_registry_enabled_default=False, PITFALLS M-12).
-    any_service_failing_entity = TraefikAnyServiceFailingBinarySensor(entry, coordinator)
-    any_middleware_failing_entity = TraefikAnyMiddlewareFailingBinarySensor(entry, coordinator)
+    any_service_failing_entity = TraefikProxyAnyServiceFailingBinarySensor(entry, coordinator)
+    any_middleware_failing_entity = TraefikProxyAnyMiddlewareFailingBinarySensor(entry, coordinator)
     async_add_entities(
         [
             *router_entities,
@@ -80,7 +80,7 @@ async def async_setup_entry(
     # Stale entity cleanup (CONTEXT.md D-18, gatus binary_sensor.py:49-71).
     # Routers that disappear from coordinator.data are removed from the
     # entity registry on the next refresh cycle. Aggregate entities
-    # (``TraefikAnyRouterFailingBinarySensor``) are NEVER deleted
+    # (``TraefikProxyAnyRouterFailingBinarySensor``) are NEVER deleted
     # (CONTEXT.md D-19 — single instance per entry, category='diagnostics'
     # so its unique_id prefix differs from ``http_router_`` and is skipped
     # below).
@@ -140,8 +140,8 @@ async def async_setup_entry(
             cache = cert_coordinator.data
             if not isinstance(cache, dict) or not cache:
                 return
-            new_entities: list[TraefikCertExpiryBinarySensor] = [
-                TraefikCertExpiryBinarySensor(entry, cert_coordinator, host.lower(), cache_value)
+            new_entities: list[TraefikProxyCertExpiryBinarySensor] = [
+                TraefikProxyCertExpiryBinarySensor(entry, cert_coordinator, host.lower(), cache_value)
                 for host, cache_value in cache.items()
             ]
             if new_entities:
@@ -191,15 +191,15 @@ async def async_setup_entry(
         entry.async_on_unload(cert_coordinator.async_add_listener(_on_cert_update))
 
 
-class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
+class TraefikProxyRouterBinarySensor(TraefikProxyEntity, BinarySensorEntity):
     """One binary_sensor per Traefik HTTP router."""
 
     _attr_device_class = BinarySensorDeviceClass.RUNNING
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
         router: dict[str, Any],
     ) -> None:
         router_name = router["name"]
@@ -238,7 +238,7 @@ class TraefikRouterBinarySensor(TraefikEntity, BinarySensorEntity):
         return self.coordinator.last_update_success
 
 
-class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
+class TraefikProxyAnyRouterFailingBinarySensor(TraefikProxyEntity, BinarySensorEntity):
     """Aggregates router health: ON when ANY router status != 'enabled'.
 
     Single instance per config entry — never deleted (CONTEXT.md D-19).
@@ -252,7 +252,7 @@ class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
     standard problem icon and groups the entity with HA's other health
     alarms. ``is_on`` is ``True`` when at least one router is anything other
     than ``enabled`` (``disabled``, ``warning``, ``error`` — matches the
-    semantics used by ``TraefikRouterBinarySensor.is_on``).
+    semantics used by ``TraefikProxyRouterBinarySensor.is_on``).
 
     Reads the raw ``http_routers`` list (NOT ``filter_internal_items``-ed)
     so a failing Traefik-internal router like ``api@internal`` can also
@@ -266,8 +266,8 @@ class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
     ) -> None:
         super().__init__(entry, category="diagnostics", description_key="any_router_failing")
         self._attr_unique_id = f"{entry.entry_id}_diagnostics_any_router_failing"
@@ -305,10 +305,10 @@ class TraefikAnyRouterFailingBinarySensor(TraefikEntity, BinarySensorEntity):
         return self.coordinator.last_update_success
 
 
-class TraefikAnyServiceFailingBinarySensor(TraefikEntity, BinarySensorEntity):
+class TraefikProxyAnyServiceFailingBinarySensor(TraefikProxyEntity, BinarySensorEntity):
     """Aggregates HTTP service health: ON when ANY service status != 'enabled'.
 
-    v0.2.0 mirror of ``TraefikAnyRouterFailingBinarySensor`` for services.
+    v0.2.0 mirror of ``TraefikProxyAnyRouterFailingBinarySensor`` for services.
     Same PROBLEM device_class + ``entity_registry_enabled_default=False``
     pattern (PITFALLS M-12 + CONTEXT.md D-19). Reads the raw
     ``http_services`` list — Traefik-internal services like
@@ -322,8 +322,8 @@ class TraefikAnyServiceFailingBinarySensor(TraefikEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
     ) -> None:
         super().__init__(entry, category="diagnostics", description_key="any_service_failing")
         self._attr_unique_id = f"{entry.entry_id}_diagnostics_any_service_failing"
@@ -358,10 +358,10 @@ class TraefikAnyServiceFailingBinarySensor(TraefikEntity, BinarySensorEntity):
         return self.coordinator.last_update_success
 
 
-class TraefikAnyMiddlewareFailingBinarySensor(TraefikEntity, BinarySensorEntity):
+class TraefikProxyAnyMiddlewareFailingBinarySensor(TraefikProxyEntity, BinarySensorEntity):
     """Aggregates HTTP middleware health: ON when ANY middleware status != 'enabled'.
 
-    v0.2.0 mirror of ``TraefikAnyRouterFailingBinarySensor`` for
+    v0.2.0 mirror of ``TraefikProxyAnyRouterFailingBinarySensor`` for
     middlewares. Middlewares are HTTP-only per Traefik's API surface, but
     they still report a ``status`` field (enabled / disabled / warning /
     error) that we aggregate here.
@@ -372,8 +372,8 @@ class TraefikAnyMiddlewareFailingBinarySensor(TraefikEntity, BinarySensorEntity)
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
     ) -> None:
         super().__init__(entry, category="diagnostics", description_key="any_middleware_failing")
         self._attr_unique_id = f"{entry.entry_id}_diagnostics_any_middleware_failing"
@@ -408,7 +408,7 @@ class TraefikAnyMiddlewareFailingBinarySensor(TraefikEntity, BinarySensorEntity)
         return self.coordinator.last_update_success
 
 
-class TraefikCertExpiryBinarySensor(TraefikEntity, BinarySensorEntity):
+class TraefikProxyCertExpiryBinarySensor(TraefikProxyEntity, BinarySensorEntity):
     """One ``PROBLEM`` binary sensor per TLS-probed hostname (TLS-02).
 
     State is ``True`` when ``days_until_expiry <= threshold_days``
@@ -430,7 +430,7 @@ class TraefikCertExpiryBinarySensor(TraefikEntity, BinarySensorEntity):
     CONTEXT.md PITFALLS M-12 — this divergence is intentional: the user
     wants the cert alarm always visible because cert expiry is a
     security-impacting event that should not require opt-in. The
-    Phase 2 ``TraefikAnyRouterFailingBinarySensor`` keeps the
+    Phase 2 ``TraefikProxyAnyRouterFailingBinarySensor`` keeps the
     ``entity_registry_enabled_default = False`` default because the
     router-failure aggregate is a noisier "any router is non-enabled"
     alarm that often reflects deployment churn (not a real outage).
@@ -439,7 +439,7 @@ class TraefikCertExpiryBinarySensor(TraefikEntity, BinarySensorEntity):
     ``sensor.py._cert_cache_availability`` helper (SUGGESTION #1 fix —
     single source of truth for cache availability across both
     platforms; no per-platform drift). The cert-expiring entity and
-    the paired ``TraefikCertTimestampSensor`` for the same host will
+    the paired ``TraefikProxyCertTimestampSensor`` for the same host will
     therefore flip to unavailable together, never out of sync.
     """
 
@@ -454,7 +454,7 @@ class TraefikCertExpiryBinarySensor(TraefikEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        entry: TraefikConfigEntry,
+        entry: TraefikProxyConfigEntry,
         coordinator: CertCoordinator,
         host: str,
         info: CertInfo | CertError | None,

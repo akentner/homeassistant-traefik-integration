@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .api import TraefikApiClient, TraefikApiError, TraefikAuthError
+from .api import TraefikProxyApiClient, TraefikProxyApiError, TraefikProxyAuthError
 from .const import (
     CONF_API_KEY,
     CONF_SCAN_INTERVAL,
@@ -31,21 +31,21 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-class TraefikData(TypedDict, total=False):
+class TraefikProxyData(TypedDict, total=False):
     """Shape of the coordinator's `data` attribute (Phase 2, CONTEXT.md D-04).
 
     All keys are optional at runtime (DataUpdateCoordinator stores a dict via
     its generic). ``total=False`` mirrors the Phase 1 behavior where any
     individual key may be missing transiently. Partial-failure policy lives
-    in ``TraefikApiClient.fetch_all`` (CONTEXT.md D-07): on a non-auth error,
+    in ``TraefikProxyApiClient.fetch_all`` (CONTEXT.md D-07): on a non-auth error,
     the entire payload is dropped so callers see a stale cycle rather than
     mixed fresh+stale data.
 
-    NOTE: Phase 1 used a PEP-695 ``type TraefikData = dict[str, Any]`` alias.
+    NOTE: Phase 1 used a PEP-695 ``type TraefikProxyData = dict[str, Any]`` alias.
     The class form (TypedDict) is the canonical Phase 2 type — every
-    ``from .coordinator import TraefikData`` continues to resolve to a valid
+    ``from .coordinator import TraefikProxyData`` continues to resolve to a valid
     type identifier (the TypedDict class itself). The PLAN.md 02-01 snippet
-    ``type TraefikData = TraefikData`` is a self-referential alias that ruff
+    ``type TraefikProxyData = TraefikProxyData`` is a self-referential alias that ruff
     + mypy both flag as a no-op redefinition; we keep the class form alone
     and surface this in SUMMARY 02-01 as a deviation.
     """
@@ -58,25 +58,25 @@ class TraefikData(TypedDict, total=False):
     overview: dict[str, Any]
 
 
-type TraefikConfigEntry = ConfigEntry["TraefikCoordinator"]
+type TraefikProxyConfigEntry = ConfigEntry["TraefikProxyCoordinator"]
 
 
-class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
+class TraefikProxyCoordinator(DataUpdateCoordinator[TraefikProxyData]):
     """Single polling point for Traefik state.
 
     Phase 3 sibling attach (PITFALLS #6): the cert coordinator is stored as
     ``cert_coordinator`` on this instance rather than as a separate
     ``runtime_data`` shape. Existing accessors like
     ``entry.runtime_data.client.reload_routers()`` keep working — the
-    ``entry.runtime_data`` value is the main ``TraefikCoordinator`` itself,
+    ``entry.runtime_data`` value is the main ``TraefikProxyCoordinator`` itself,
     with the cert coordinator as an additional attribute.
     """
 
-    config_entry: TraefikConfigEntry
-    client: TraefikApiClient
+    config_entry: TraefikProxyConfigEntry
+    client: TraefikProxyApiClient
     cert_coordinator: CertCoordinator | None = None
 
-    def __init__(self, hass: HomeAssistant, entry: TraefikConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, entry: TraefikProxyConfigEntry) -> None:
         """Construct coordinator from a config entry's data + options."""
         scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         super().__init__(
@@ -86,17 +86,17 @@ class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
             name=entry.title or "Traefik",
             update_interval=timedelta(seconds=scan_interval),
         )
-        self.client = TraefikApiClient(
+        self.client = TraefikProxyApiClient(
             session=aiohttp_client.async_get_clientsession(hass),
             base_url=entry.data[CONF_URL],
             api_key=entry.data[CONF_API_KEY],
             verify_ssl=entry.options.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
         )
 
-    async def _async_update_data(self) -> TraefikData:
+    async def _async_update_data(self) -> TraefikProxyData:
         """Fetch the six Traefik endpoints in parallel; map errors per CONTEXT.md D-07.
 
-        Partial-failure policy is enforced inside ``TraefikApiClient.fetch_all``
+        Partial-failure policy is enforced inside ``TraefikProxyApiClient.fetch_all``
         (CONTEXT.md D-07): any non-auth error drops the entire payload so
         callers see a stale cycle rather than mixed fresh+stale data. Auth
         errors propagate unchanged so this method only needs to translate
@@ -104,11 +104,11 @@ class TraefikCoordinator(DataUpdateCoordinator[TraefikData]):
         """
         try:
             result = await self.client.fetch_all()
-        except TraefikAuthError as err:
+        except TraefikProxyAuthError as err:
             raise ConfigEntryAuthFailed from err
-        except TraefikApiError as err:
+        except TraefikProxyApiError as err:
             raise UpdateFailed(str(err)) from err
         # ``fetch_all`` returns a plain dict that matches the TypedDict shape;
-        # cast at the boundary so the static type stays TraefikData (TypedDict
+        # cast at the boundary so the static type stays TraefikProxyData (TypedDict
         # instances ARE dicts at runtime).
         return result  # type: ignore[return-value]

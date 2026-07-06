@@ -1,15 +1,13 @@
-# Home Assistant Traefik Integration
+# Home Assistant Traefik Proxy Integration
 
-Expose your Traefik reverse-proxy state as Home Assistant entities.
+Expose your Traefik Proxy reverse-proxy state as Home Assistant entities.
 See at a glance which routers are enabled, which are failing.
 
 ## What it does
 
-Phase 1 (this release):
-
 - One `binary_sensor` per Traefik HTTP router (state: enabled / not enabled)
 - Polls `/api/version` + `/api/http/routers` every 15 seconds (configurable in Phase 2)
-- UI config flow (`Configuration → Integrations → Add → Traefik`) or YAML
+- UI config flow (`Configuration → Integrations → Add → Traefik Proxy`) or YAML
 - Bearer token per request — never logged; never stored as a session default
 
 Phase 2+ (planned, not in this release): entrypoints, services, overview,
@@ -20,14 +18,14 @@ reload service, options flow, reauth flow, TLS certificate expiry.
 ### HACS (recommended)
 
 1. HACS → Integrations → ⋮ → Custom repositories
-2. Add `https://github.com/akentner/homeassistant-traefik-integration` (Integration)
+2. Add `https://github.com/akentner/homeassistant-traefik-proxy-integration` (Integration)
 3. Install → Restart Home Assistant
-4. Settings → Devices & Services → + Add Integration → Traefik
+4. Settings → Devices & Services → + Add Integration → Traefik Proxy
 
 ### Manual
 
 ```bash
-scp -r custom_components/traefik haos-op3050-1:/config/custom_components/
+scp -r custom_components/traefik_proxy haos-op3050-1:/config/custom_components/
 ha core restart
 ```
 
@@ -37,11 +35,11 @@ ha core restart
 
 ### UI flow (recommended)
 
-Settings → Devices & Services → + Add Integration → Traefik:
+Settings → Devices & Services → + Add Integration → Traefik Proxy:
 
 | Field       | Example                              | Notes |
 |-------------|--------------------------------------|-------|
-| URL         | `https://traefik.example.com:8080`   | Where Traefik's API is reachable. |
+| URL         | `https://traefik.example.com:8080`   | Where Traefik Proxy's API is reachable. |
 | API key     | (paste from Traefik static config)   | Bearer token from `api.dashboard` or your auth middleware. |
 | Verify SSL  | `true`                               | Disable for self-signed certificates. |
 
@@ -49,7 +47,7 @@ Settings → Devices & Services → + Add Integration → Traefik:
 
 ```yaml
 # configuration.yaml
-traefik:
+traefik_proxy:
   url: https://traefik.example.com:8080
   api_key: "${traefik_bearer_token}"
   verify_ssl: true
@@ -58,8 +56,8 @@ traefik:
 ## Troubleshooting
 
 - **`invalid_auth`** — bearer token rejected (401/403). Generate a new one in Traefik's static config.
-- **`api_disabled`** — Traefik's `api:` block isn't enabled. Add `api: insecure: true` (with HTTPS reverse-proxy in front) or enable the dashboard.
-- **`cannot_connect`** — Traefik unreachable. Verify URL, network, firewall.
+- **`api_disabled`** — Traefik Proxy's `api:` block isn't enabled. Add `api: insecure: true` (with HTTPS reverse-proxy in front) or enable the dashboard.
+- **`cannot_connect`** — Traefik Proxy unreachable. Verify URL, network, firewall.
 
 ## Attribution
 
@@ -75,9 +73,9 @@ plus a `Diagnostics` device for problem aggregates.
 
 Three sensors on the **Overview** device, one per Traefik category:
 
-- `sensor.traefik_routers`
-- `sensor.traefik_services`
-- `sensor.traefik_middlewares`
+- `sensor.traefik_proxy_routers`
+- `sensor.traefik_proxy_services`
+- `sensor.traefik_proxy_middlewares`
 
 Each sensor exposes the following attributes (read live from
 `coordinator.data` on every cycle — see CHANGELOG for the v0.1.4 fix):
@@ -99,9 +97,9 @@ Three binary sensors with `device_class=PROBLEM` and
 `entity_registry_enabled_default=False` (PITFALLS M-12 — opt-in, doesn't
 pollute the States panel):
 
-- `binary_sensor.traefik_any_router_failing` (Phase 2)
-- `binary_sensor.traefik_any_service_failing` (v0.2.0)
-- `binary_sensor.traefik_any_middleware_failing` (v0.2.0)
+- `binary_sensor.traefik_proxy_any_router_failing` (Phase 2)
+- `binary_sensor.traefik_proxy_any_service_failing` (v0.2.0)
+- `binary_sensor.traefik_proxy_any_middleware_failing` (v0.2.0)
 
 Each is `True` when at least one item has `status != "enabled"`.
 Attributes expose the failing item names so dashboards can drill down.
@@ -109,69 +107,219 @@ Attributes expose the failing item names so dashboards can drill down.
 ### Replicating the Traefik dashboard pie charts in HA
 
 The Traefik dashboard renders three pie slices per category (success /
-warning / error). Replicate with `custom:modern-circular-gauge` (HACS
-Frontend card):
+warning / error). Replicate with `custom:apexcharts-card` (HACS
+Frontend card) — three pie cards, one per category, fed from our
+breakdown attributes:
 
 ```yaml
 type: grid
-columns: 4
-square: false
+columns: 3
 cards:
-  - type: custom:modern-circular-gauge
-    entity: sensor.traefik_routers
-    name: Routers — Success
-    min: 0
-    max: "{{ states('sensor.traefik_routers') | int(0) }}"
-    value: "{{ state_attr('sensor.traefik_routers', 'success_count') | int(0) }}"
-    color_stops:
-      0: "#28a745"
-      100: "#28a745"
+  - type: custom:apexcharts-card
+    chart_type: pie
+    header:
+      title: Routers — Status
+      show: true
+    series:
+      - entity: sensor.traefik_proxy_routers
+        attribute: success_count
+        name: Success
+      - entity: sensor.traefik_proxy_routers
+        attribute: warning_count
+        name: Warning
+      - entity: sensor.traefik_proxy_routers
+        attribute: error_count
+        name: Error
+    chart_options:
+      chart:
+        height: 280px
+      plotOptions:
+        pie:
+          expandOnClick: false
+      legend:
+        position: bottom
+      colors:
+        - "#28a745"
+        - "#ffc107"
+        - "#dc3545"
 
-  - type: custom:modern-circular-gauge
-    entity: sensor.traefik_routers
-    name: Routers — Warning
-    value: "{{ state_attr('sensor.traefik_routers', 'warning_count') | int(0) }}"
-    color_stops:
-      0: "#ffc107"
-      100: "#ffc107"
+  - type: custom:apexcharts-card
+    chart_type: pie
+    header:
+      title: Services — Status
+      show: true
+    series:
+      - entity: sensor.traefik_proxy_services
+        attribute: success_count
+        name: Success
+      - entity: sensor.traefik_proxy_services
+        attribute: warning_count
+        name: Warning
+      - entity: sensor.traefik_proxy_services
+        attribute: error_count
+        name: Error
+    chart_options:
+      chart:
+        height: 280px
+      plotOptions:
+        pie:
+          expandOnClick: false
+      legend:
+        position: bottom
+      colors:
+        - "#28a745"
+        - "#ffc107"
+        - "#dc3545"
 
-  - type: custom:modern-circular-gauge
-    entity: sensor.traefik_routers
-    name: Routers — Error
-    value: "{{ state_attr('sensor.traefik_routers', 'error_count') | int(0) }}"
-    color_stops:
-      0: "#dc3545"
-      100: "#dc3545"
-
-  - type: custom:modern-circular-gauge
-    entity: sensor.traefik_routers
-    name: Routers — Disabled
-    value: "{{ state_attr('sensor.traefik_routers', 'disabled_count') | int(0) }}"
-    color_stops:
-      0: "#6c757d"
-      100: "#6c757d"
+  - type: custom:apexcharts-card
+    chart_type: pie
+    header:
+      title: Middlewares — Status
+      show: true
+    series:
+      - entity: sensor.traefik_proxy_middlewares
+        attribute: success_count
+        name: Success
+      - entity: sensor.traefik_proxy_middlewares
+        attribute: warning_count
+        name: Warning
+      - entity: sensor.traefik_proxy_middlewares
+        attribute: error_count
+        name: Error
+    chart_options:
+      chart:
+        height: 280px
+      plotOptions:
+        pie:
+          expandOnClick: false
+      legend:
+        position: bottom
+      colors:
+        - "#28a745"
+        - "#ffc107"
+        - "#dc3545"
 ```
 
-Repeat the four-card grid for `sensor.traefik_services` and
-`sensor.traefik_middlewares`. The `max: "{{ states('sensor.traefik_routers') | int(0) }}"`
-expression sets the gauge scale to the current filtered total so each
-slice reads as "N of M".
+### Success-rate radial bars
 
-For a single composite gauge showing the success rate as a percentage:
+A composite gauge per category showing the success rate as a percentage
+(`success_count / (success_count + warning_count + error_count) × 100`):
 
 ```yaml
-type: custom:modern-circular-gauge
-entity: sensor.traefik_routers
-name: Routers — Success Rate
-value: "{{ state_attr('sensor.traefik_routers', 'success_pct') | float(0) }}"
-min: 0
-max: 100
-unit: "%"
-color_stops:
-  0: "#dc3545"
-  80: "#ffc107"
-  100: "#28a745"
+type: grid
+columns: 3
+cards:
+  - type: custom:apexcharts-card
+    chart_type: radialBar
+    header:
+      title: Routers — Success Rate
+      show: true
+    series:
+      - entity: sensor.traefik_proxy_routers
+        attribute: success_pct
+        name: Success Rate
+    chart_options:
+      chart:
+        height: 280px
+      plotOptions:
+        radialBar:
+          startAngle: -135
+          endAngle: 135
+          hollow:
+            size: "60%"
+      fill:
+        colors:
+          - "#28a745"
+          - "#ffc107"
+          - "#dc3545"
+      legend:
+        show: false
+
+  - type: custom:apexcharts-card
+    chart_type: radialBar
+    header:
+      title: Services — Success Rate
+      show: true
+    series:
+      - entity: sensor.traefik_proxy_services
+        attribute: success_pct
+        name: Success Rate
+    chart_options:
+      chart:
+        height: 280px
+      plotOptions:
+        radialBar:
+          startAngle: -135
+          endAngle: 135
+          hollow:
+            size: "60%"
+      fill:
+        colors:
+          - "#28a745"
+          - "#ffc107"
+          - "#dc3545"
+      legend:
+        show: false
+
+  - type: custom:apexcharts-card
+    chart_type: radialBar
+    header:
+      title: Middlewares — Success Rate
+      show: true
+    series:
+      - entity: sensor.traefik_proxy_middlewares
+        attribute: success_pct
+        name: Success Rate
+    chart_options:
+      chart:
+        height: 280px
+      plotOptions:
+        radialBar:
+          startAngle: -135
+          endAngle: 135
+          hollow:
+            size: "60%"
+      fill:
+        colors:
+          - "#28a745"
+          - "#ffc107"
+          - "#dc3545"
+      legend:
+        show: false
 ```
 
-Combine with a `binary_sensor.traefik_any_router_failing` card on a
-**Conditions** card to alert when any item leaves the `enabled` state.
+### Failure alarms
+
+`Conditions` cards that fire when any item leaves the `enabled` state:
+
+```yaml
+type: conditional
+conditions:
+  - entity: binary_sensor.traefik_proxy_any_router_failing
+    state: "on"
+card:
+  type: markdown
+  content: "## ⚠️ A Traefik router is failing"
+```
+
+Repeat the same pattern for `any_service_failing` and
+`any_middleware_failing`. Enable the entities explicitly (they ship
+disabled-by-default per PITFALLS M-12).
+
+### Certificate expiry
+
+Per-host entities on the **HTTP Routers TLS** device:
+
+- `sensor.traefik_proxy_<host>_cert` (`TIMESTAMP` device class) — cert's
+  `not_after` datetime, plus `days_until_expiry`, `subject`, `issuer`,
+  `san`, `san_mismatch`, `last_error` attributes.
+- `binary_sensor.traefik_proxy_<host>_expiring` (`PROBLEM` device
+  class, default-enabled) — `is_on = days_until_expiry <= threshold_days`
+  (the threshold is configurable via Options).
+
+The cert coordinator probes every distinct hostname every 6 h with a
+`Semaphore(4)` + 5 s per-handshake timeout. Hosts whose TLS handshake
+fails (timeout, refused, DNS error, parse error) get a typed
+`CertError` row with `last_error` — they show up only as the
+expiring-binary sensor (no timestamp sensor without a valid
+`not_after`).

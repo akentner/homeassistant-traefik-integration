@@ -1,0 +1,13 @@
+{
+  "domain": "traefik_proxy",
+  "name": "Traefik Proxy",
+  "after_dependencies": ["http"],
+  "codeowners": ["@akentner"],
+  "config_flow": true,
+  "documentation": "https://github.com/akentner/homeassistant-traefik-proxy-integration",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/akentner/homeassistant-traefik-proxy-integration/issues",
+  "requirements": [],
+  "version": "0.3.0"
+}

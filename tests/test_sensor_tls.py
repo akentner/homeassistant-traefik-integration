@@ -1,4 +1,4 @@
-"""Tests for ``TraefikCertTimestampSensor`` (Phase 3 TLS-01).
+"""Tests for ``TraefikProxyCertTimestampSensor`` (Phase 3 TLS-01).
 
 Mirrors the Phase 2 ``test_sensor.py`` approach — ``MagicMock`` powers
 the coordinator; this test surface focuses on state derivation, not
@@ -26,8 +26,8 @@ from unittest.mock import MagicMock
 
 from homeassistant.util import slugify
 
-from custom_components.traefik.sensor import TraefikCertTimestampSensor
-from custom_components.traefik.tls import CertError, CertInfo
+from custom_components.traefik_proxy.sensor import TraefikProxyCertTimestampSensor
+from custom_components.traefik_proxy.tls import CertError, CertInfo
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,7 +35,7 @@ from custom_components.traefik.tls import CertError, CertInfo
 
 
 def _entry() -> MagicMock:
-    """Build a mock TraefikConfigEntry for the cert sensor."""
+    """Build a mock TraefikProxyConfigEntry for the cert sensor."""
     entry: MagicMock = MagicMock()
     entry.entry_id = "test-entry"
     entry.data = {"url": "https://traefik.example.com:8080"}
@@ -88,7 +88,7 @@ def _coord(
 def test_native_value_returns_not_after_datetime() -> None:
     """``native_value`` reads ``not_after`` from the cache row."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     assert entity.native_value == info.not_after
     assert isinstance(entity.native_value, datetime)
 
@@ -98,14 +98,14 @@ def test_native_value_is_none_when_host_not_in_cache() -> None:
 
     The timestamp sensor only exists for ``CertInfo`` cache rows —
     per production ``async_setup_entry`` (``sensor.py``:142-144) an
-    error row hosts a ``TraefikCertExpiryBinarySensor`` only. So the
+    error row hosts a ``TraefikProxyCertExpiryBinarySensor`` only. So the
     "CertError in cache" scenario is exercised by the binary-sensor
     test below; for the timestamp sensor we simulate the cold-start
     state where the cache is missing the host entirely.
     """
     info = _cert_info()
     coord = _coord(cache={}, last_update_success=False)  # host not in cache
-    entity = TraefikCertTimestampSensor(_entry(), coord, "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), coord, "api.example.com", info)
     assert entity.native_value is None
 
 
@@ -118,14 +118,14 @@ def test_available_false_when_host_not_in_cache() -> None:
     """Cold start → unavailable."""
     info = _cert_info()
     coord = _coord(cache={}, last_update_success=False)
-    entity = TraefikCertTimestampSensor(_entry(), coord, "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), coord, "api.example.com", info)
     assert entity.available is False
 
 
 def test_available_true_on_certinfo() -> None:
     """Fresh ``CertInfo`` row → ``available=True``."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     assert entity.available is True
 
 
@@ -137,7 +137,7 @@ def test_available_true_on_certinfo() -> None:
 def test_extra_state_attributes_always_include_days_until_expiry_on_success() -> None:
     """``days_until_expiry`` attribute present even when sensor is in error state."""
     info = _cert_info(days_until_expiry=30)
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     attrs = entity.extra_state_attributes
     assert attrs["days_until_expiry"] == 30
     assert attrs["san_mismatch"] is False
@@ -153,7 +153,7 @@ def test_extra_state_attributes_days_until_expiry_none_on_cold_start() -> None:
     """
     info = _cert_info()
     coord = _coord(cache={}, last_update_success=False)
-    entity = TraefikCertTimestampSensor(_entry(), coord, "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), coord, "api.example.com", info)
     attrs = entity.extra_state_attributes
     assert attrs["days_until_expiry"] is None
     assert "days_until_expiry" in attrs  # D-04: always present
@@ -162,7 +162,7 @@ def test_extra_state_attributes_days_until_expiry_none_on_cold_start() -> None:
 def test_extra_state_attributes_san_mismatch_surfaced() -> None:
     """``san_mismatch=True`` flows through to attributes verbatim."""
     info = _cert_info(san_mismatch=True)
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     attrs = entity.extra_state_attributes
     assert attrs["san_mismatch"] is True
 
@@ -178,7 +178,7 @@ def test_extra_state_attributes_expose_last_error_on_last_cycle_failure() -> Non
     """
     info = _cert_info(days_until_expiry=10)
     coord = _coord(cache={"api.example.com": info}, last_update_success=False)
-    entity = TraefikCertTimestampSensor(_entry(), coord, "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), coord, "api.example.com", info)
     attrs = entity.extra_state_attributes
     assert attrs["last_error"] is None
     assert attrs["days_until_expiry"] == 10
@@ -187,7 +187,7 @@ def test_extra_state_attributes_expose_last_error_on_last_cycle_failure() -> Non
 def test_extra_state_attributes_includes_subject_issuer_san() -> None:
     """Subject, issuer, SAN list surface in ``extra_state_attributes``."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     attrs = entity.extra_state_attributes
     assert attrs["subject"] == "CN=api.example.com"
     assert attrs["issuer"] == "CN=Test CA"
@@ -202,30 +202,30 @@ def test_extra_state_attributes_includes_subject_issuer_san() -> None:
 def test_unique_id_format() -> None:
     """``unique_id`` mirrors ``f"{entry_id}_tls_cert_{host}"``."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     assert entity.unique_id == "test-entry_tls_cert_api.example.com"
 
 
 def test_entity_id_format() -> None:
     """``entity_id`` follows ``sensor.traefik_<slug>_cert`` convention."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     assert entity.entity_id == f"sensor.traefik_{slugify('api.example.com')}_cert"
 
 
 def test_device_info_uses_http_routers_tls_category() -> None:
     """The sensor clusters on the new ``http_routers_tls`` per-category device."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     info_di = entity.device_info
-    assert ("traefik", "test-entry_http_routers_tls") in info_di["identifiers"]
+    assert ("traefik_proxy", "test-entry_http_routers_tls") in info_di["identifiers"]
     assert info_di["model"] == "HTTP Routers TLS"
 
 
 def test_name_includes_host() -> None:
     """The sensor name embeds the host so dashboards can identify the cert."""
     info = _cert_info()
-    entity = TraefikCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
+    entity = TraefikProxyCertTimestampSensor(_entry(), _coord(cache={"api.example.com": info}), "api.example.com", info)
     name = str(entity.name or "")
     assert "api.example.com" in name
 
@@ -251,7 +251,7 @@ async def test_restore_after_ha_restart_rebinds_existing_entities(hass: object, 
     from datetime import UTC, datetime, timedelta
     from unittest.mock import MagicMock
 
-    from custom_components.traefik.tls import CertInfo
+    from custom_components.traefik_proxy.tls import CertInfo
 
     now = datetime.now(tz=UTC)
     # Two hosts in the cache, both with valid CertInfo rows.
@@ -322,16 +322,16 @@ async def test_restore_after_ha_restart_rebinds_existing_entities(hass: object, 
         # body without going through async_setup_entry (which needs the full
         # entry-as-up-bound setup including coordinator wiring we don't
         # want to mock here).
-        from custom_components.traefik.sensor import TraefikCertTimestampSensor
+        from custom_components.traefik_proxy.sensor import TraefikProxyCertTimestampSensor
 
         new_entities = []
         for host, cache_value in cache.items():
-            from custom_components.traefik.tls import is_error
+            from custom_components.traefik_proxy.tls import is_error
 
             if is_error(cache_value):
                 continue
             info: CertInfo = cache_value  # type: ignore[assignment]
-            new_entities.append(TraefikCertTimestampSensor(entry, cert_coord, host.lower(), info))
+            new_entities.append(TraefikProxyCertTimestampSensor(entry, cert_coord, host.lower(), info))
         if new_entities:
             captured_async_add_entities(new_entities)
 
@@ -341,7 +341,7 @@ async def test_restore_after_ha_restart_rebinds_existing_entities(hass: object, 
         "n8n.akentner.de",
     }
     for entity in added:
-        assert isinstance(entity, TraefikCertTimestampSensor)
+        assert isinstance(entity, TraefikProxyCertTimestampSensor)
         # Each entity is wired to the main coordinator (sibling-cert pattern,
         # PITFALLS #6). The cert coordinator is reachable as
         # ``entity.coordinator.cert_coordinator`` so the cert-update listener

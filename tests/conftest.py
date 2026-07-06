@@ -22,10 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # ``tls`` module is bound in this conftest's frame BEFORE the
 # pytest-homeassistant-custom-component namespace hijack of the
 # ``custom_components`` name takes effect. Later in-fixture
-# ``from custom_components.traefik import tls`` references then resolve
+# ``from custom_components.traefik_proxy import tls`` references then resolve
 # to the real production module rather than the testing_config stub
 # that ships with ``pytest_homeassistant_custom_component``.
-from custom_components.traefik import tls as _tls_module  # pre-import for in-fixture patching
+from custom_components.traefik_proxy import tls as _tls_module  # pre-import for in-fixture patching
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -43,8 +43,8 @@ def enable_custom_integrations(hass):  # type: ignore[no-untyped-def]
 def mock_traefik_config_entry() -> MockConfigEntry:
     """A config entry for the Traefik integration, valid for happy-path tests."""
     return MockConfigEntry(
-        domain="traefik",
-        title="Traefik",
+        domain="traefik_proxy",
+        title="Traefik Proxy",
         data={
             "url": "https://traefik.example.com:8080",
             "api_key": "test-secret",

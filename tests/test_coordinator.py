@@ -1,4 +1,4 @@
-"""Integration tests for TraefikCoordinator + __init__.py lifecycle.
+"""Integration tests for TraefikProxyCoordinator + __init__.py lifecycle.
 
 Mirrors the gatus project's test_init.py patterns: state-machine assertions
 (LOADED / SETUP_RETRY / SETUP_ERROR) and runtime_data wiring verified via
@@ -10,7 +10,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.traefik.const import (
+from custom_components.traefik_proxy.const import (
     CONF_API_KEY,
     CONF_URL,
     CONF_VERIFY_SSL,
@@ -57,7 +57,7 @@ def _stub_all_endpoints(aioclient_mock, *, routers: list | None = None) -> None:
 
 async def test_setup_creates_coordinator_in_runtime_data(hass, aioclient_mock) -> None:
     """Happy path: async_setup_entry creates the coordinator in entry.runtime_data."""
-    from custom_components.traefik.coordinator import TraefikCoordinator
+    from custom_components.traefik_proxy.coordinator import TraefikProxyCoordinator
 
     _stub_all_endpoints(aioclient_mock)
 
@@ -69,7 +69,7 @@ async def test_setup_creates_coordinator_in_runtime_data(hass, aioclient_mock) -
 
     assert result is True
     assert entry.state is ConfigEntryState.LOADED
-    assert isinstance(entry.runtime_data, TraefikCoordinator)
+    assert isinstance(entry.runtime_data, TraefikProxyCoordinator)
     assert entry.runtime_data.data["version"]["Version"] == "3.1.4"
 
 
@@ -105,7 +105,7 @@ async def test_network_failure_triggers_setup_retry(hass, aioclient_mock) -> Non
 
 
 async def test_5xx_triggers_setup_retry(hass, aioclient_mock) -> None:
-    """TraefikApiError (5xx) is mapped to UpdateFailed -> ConfigEntryNotReady -> SETUP_RETRY."""
+    """TraefikProxyApiError (5xx) is mapped to UpdateFailed -> ConfigEntryNotReady -> SETUP_RETRY."""
     aioclient_mock.get(f"{MOCK_URL}/api/version", status=500)
 
     entry = _make_entry()
@@ -118,7 +118,7 @@ async def test_5xx_triggers_setup_retry(hass, aioclient_mock) -> None:
 
 
 async def test_401_triggers_setup_error(hass, aioclient_mock) -> None:
-    """TraefikAuthError is mapped to ConfigEntryAuthFailed -> SETUP_ERROR."""
+    """TraefikProxyAuthError is mapped to ConfigEntryAuthFailed -> SETUP_ERROR."""
     aioclient_mock.get(f"{MOCK_URL}/api/version", status=401)
 
     entry = _make_entry()

@@ -1,4 +1,4 @@
-"""Tests for ``TraefikCertExpiryBinarySensor`` (Phase 3 TLS-02).
+"""Tests for ``TraefikProxyCertExpiryBinarySensor`` (Phase 3 TLS-02).
 
 Phase-3-specific contract pins:
 
@@ -10,7 +10,7 @@ Phase-3-specific contract pins:
   re-eval — no re-handshake needed).
 - ``_attr_entity_registry_enabled_default`` is ``True`` (D-03) — the
   intentional inversion from Phase 2's M-12 default-off for
-  ``TraefikAnyRouterFailingBinarySensor``.
+  ``TraefikProxyAnyRouterFailingBinarySensor``.
 - ``days_until_expiry`` + ``threshold_days`` are ALWAYS present in
   ``extra_state_attributes`` (D-04 + D-08).
 - ``device_class == PROBLEM`` (D-14).
@@ -26,11 +26,11 @@ import pytest
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.util import slugify
 
-from custom_components.traefik.binary_sensor import (
-    TraefikAnyRouterFailingBinarySensor,
-    TraefikCertExpiryBinarySensor,
+from custom_components.traefik_proxy.binary_sensor import (
+    TraefikProxyAnyRouterFailingBinarySensor,
+    TraefikProxyCertExpiryBinarySensor,
 )
-from custom_components.traefik.tls import CertError, CertInfo
+from custom_components.traefik_proxy.tls import CertError, CertInfo
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -89,12 +89,12 @@ def _entity(
     cache_value: CertInfo | CertError | None = None,
     threshold_days: int = 14,
     last_update_success: bool = True,
-) -> TraefikCertExpiryBinarySensor:
+) -> TraefikProxyCertExpiryBinarySensor:
     if cache_value is None:
         cache_value = _cert_info(host=host)
     cache: dict[str, Any] = {host: cast(Any, cache_value)}
     coord = _coord(host=host, cache=cache, threshold_days=threshold_days, last_update_success=last_update_success)
-    return TraefikCertExpiryBinarySensor(_entry(), coord, host, cache_value)
+    return TraefikProxyCertExpiryBinarySensor(_entry(), coord, host, cache_value)
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ def test_is_on_unknown_when_host_not_in_cache() -> None:
     """Cold start with empty cache → ``is_on=None``."""
     entry = _entry()
     coord = _coord(cache={}, last_update_success=False)
-    entity = TraefikCertExpiryBinarySensor(entry, coord, "api.example.com", None)
+    entity = TraefikProxyCertExpiryBinarySensor(entry, coord, "api.example.com", None)
     assert entity.is_on is None
 
 
@@ -146,7 +146,7 @@ def test_available_false_on_cold_start() -> None:
     """Empty cache + ``last_update_success=False`` → unavailable."""
     entry = _entry()
     coord = _coord(cache={}, last_update_success=False)
-    entity = TraefikCertExpiryBinarySensor(entry, coord, "api.example.com", None)
+    entity = TraefikProxyCertExpiryBinarySensor(entry, coord, "api.example.com", None)
     assert entity.available is False
 
 
@@ -192,7 +192,7 @@ def test_extra_state_attributes_expose_last_error_on_certerror() -> None:
     err = _cert_error(code="timeout")
     cache = cast(dict[str, Any], {"api.example.com": err})
     coord = _coord(cache=cache, last_update_success=False)
-    entity = TraefikCertExpiryBinarySensor(_entry(), coord, "api.example.com", err)
+    entity = TraefikProxyCertExpiryBinarySensor(_entry(), coord, "api.example.com", err)
     attrs = entity.extra_state_attributes
     assert attrs["last_error"] == "timeout"
     assert attrs["days_until_expiry"] is None
@@ -227,7 +227,7 @@ def test_entity_registry_enabled_default_is_true() -> None:
     HA's ``CachedProperties`` metaclass moves ``_attr_*`` to ``__attr_*``;
     the test reads the private name to pin the boolean value.
     """
-    assert TraefikCertExpiryBinarySensor.__dict__.get("__attr_entity_registry_enabled_default") is True
+    assert TraefikProxyCertExpiryBinarySensor.__dict__.get("__attr_entity_registry_enabled_default") is True
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ def test_state_transitions_when_threshold_changes() -> None:
     """
     info = _cert_info(days_until_expiry=10)
     coord = _coord(cache={"api.example.com": info}, threshold_days=14)
-    entity = TraefikCertExpiryBinarySensor(_entry(), coord, "api.example.com", info)
+    entity = TraefikProxyCertExpiryBinarySensor(_entry(), coord, "api.example.com", info)
     assert entity.is_on is True  # baseline: 10 <= 14 — alarm ON
 
     # Raise the threshold so the cert becomes "comfortable".
@@ -268,18 +268,20 @@ def test_state_transitions_when_threshold_changes() -> None:
 def test_distinct_from_any_router_failing_enabled_default() -> None:
     """Phase 3 inverts Phase 2's default — pin the intentional divergence.
 
-    ``TraefikAnyRouterFailingBinarySensor`` (Phase 2 M-12) is opt-in via
+    ``TraefikProxyAnyRouterFailingBinarySensor`` (Phase 2 M-12) is opt-in via
     ``entity_registry_enabled_default=False`` because the
-    router-failure alarm is noisy. ``TraefikCertExpiryBinarySensor``
+    router-failure alarm is noisy. ``TraefikProxyCertExpiryBinarySensor``
     (Phase 3 D-03) is ALWAYS ON by default because cert expiry is a
     security-impacting event. The two classes MUST invert.
     """
-    any_router_default: Any = TraefikAnyRouterFailingBinarySensor.__dict__.get("__attr_entity_registry_enabled_default")
-    cert_expiry_default: Any = TraefikCertExpiryBinarySensor.__dict__.get("__attr_entity_registry_enabled_default")
+    any_router_default: Any = TraefikProxyAnyRouterFailingBinarySensor.__dict__.get(
+        "__attr_entity_registry_enabled_default"
+    )
+    cert_expiry_default: Any = TraefikProxyCertExpiryBinarySensor.__dict__.get("__attr_entity_registry_enabled_default")
     assert any_router_default is False, (
-        f"Phase 2 TraefikAnyRouterFailingBinarySensor default must stay False; got {any_router_default!r}"
+        f"Phase 2 TraefikProxyAnyRouterFailingBinarySensor default must stay False; got {any_router_default!r}"
     )
     assert cert_expiry_default is True, (
-        f"Phase 3 TraefikCertExpiryBinarySensor default must be True; got {cert_expiry_default!r}"
+        f"Phase 3 TraefikProxyCertExpiryBinarySensor default must be True; got {cert_expiry_default!r}"
     )
     assert any_router_default is not cert_expiry_default  # explicit: inverted

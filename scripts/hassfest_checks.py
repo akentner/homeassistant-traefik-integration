@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-INTEGRATION = ROOT / "custom_components" / "traefik"
+INTEGRATION = ROOT / "custom_components" / "traefik_proxy"
 TRANSLATIONS = INTEGRATION / "translations"
 URL_RE = re.compile(r"https?://|wss?://", re.IGNORECASE)
 

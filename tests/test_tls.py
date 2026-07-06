@@ -1,4 +1,4 @@
-"""Phase 3 TEST-04 contract tests for ``custom_components.traefik.tls``.
+"""Phase 3 TEST-04 contract tests for ``custom_components.traefik_proxy.tls``.
 
 TEST-04 mandates ``≥3 known notAfter shapes parse, ≥2 invalid shapes
 reject``. The spike 002 catalogue (six known shapes) and a five-element
@@ -28,8 +28,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.traefik.const import TLS_HANDSHAKE_TIMEOUT
-from custom_components.traefik.tls import (
+from custom_components.traefik_proxy.const import TLS_HANDSHAKE_TIMEOUT
+from custom_components.traefik_proxy.tls import (
     NOTAFTER_FORMATS,
     CertError,
     CertInfo,
@@ -106,10 +106,10 @@ def test_log_throttle_suppresses_repeated_failures(
     test bleed is possible.
     """
     # Mirror the test in tls.py — module-level state needs scoping.
-    monkeypatch.setattr("custom_components.traefik.tls._parse_log_cooldown", {}, raising=False)
+    monkeypatch.setattr("custom_components.traefik_proxy.tls._parse_log_cooldown", {}, raising=False)
 
     debug_spy = MagicMock()
-    monkeypatch.setattr("custom_components.traefik.tls._LOGGER.debug", debug_spy)
+    monkeypatch.setattr("custom_components.traefik_proxy.tls._LOGGER.debug", debug_spy)
 
     host = "throttle-test.example.test"
     raw = "garbage"
@@ -131,9 +131,9 @@ def test_log_throttle_per_host_independent(
     D-11 semantics are per-host, not global. A second host must NOT
     piggyback on the first host's 24h cooldown.
     """
-    monkeypatch.setattr("custom_components.traefik.tls._parse_log_cooldown", {}, raising=False)
+    monkeypatch.setattr("custom_components.traefik_proxy.tls._parse_log_cooldown", {}, raising=False)
     debug_spy = MagicMock()
-    monkeypatch.setattr("custom_components.traefik.tls._LOGGER.debug", debug_spy)
+    monkeypatch.setattr("custom_components.traefik_proxy.tls._LOGGER.debug", debug_spy)
 
     _log_parse_failure_once("host-a.example.test", "garbage")
     _log_parse_failure_once("host-b.example.test", "garbage")

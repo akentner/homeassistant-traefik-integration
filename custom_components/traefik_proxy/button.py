@@ -1,6 +1,6 @@
 """Button entities for the Traefik integration.
 
-Phase 2 plan 02-03 fills this out with `TraefikReloadButton` on the Diagnostics
+Phase 2 plan 02-03 fills this out with `TraefikProxyReloadButton` on the Diagnostics
 device (CONTEXT.md D-13). The button fires the same handler as the
 `traefik.reload_routers` service registered in `__init__.py` (plan 02-04) —
 going through the service (not `client.reload_routers()` directly) means HA's
@@ -16,28 +16,28 @@ from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .entity import TraefikEntity
+from .entity import TraefikProxyEntity
 
 if TYPE_CHECKING:
-    from .coordinator import TraefikConfigEntry, TraefikCoordinator
+    from .coordinator import TraefikProxyConfigEntry, TraefikProxyCoordinator
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: TraefikConfigEntry,
+    entry: TraefikProxyConfigEntry,
     async_add_entities: Any,
 ) -> None:
     """Set up Traefik button entities for a config entry.
 
-    Always creates exactly one `TraefikReloadButton` (single instance per
+    Always creates exactly one `TraefikProxyReloadButton` (single instance per
     config entry — never deleted, lives on the Diagnostics device per
     CONTEXT.md D-14/D-19).
     """
-    coordinator: TraefikCoordinator = entry.runtime_data
-    async_add_entities([TraefikReloadButton(hass, entry, coordinator)])
+    coordinator: TraefikProxyCoordinator = entry.runtime_data
+    async_add_entities([TraefikProxyReloadButton(hass, entry, coordinator)])
 
 
-class TraefikReloadButton(TraefikEntity, ButtonEntity):
+class TraefikProxyReloadButton(TraefikProxyEntity, ButtonEntity):
     """Button that triggers `traefik.reload_routers` (CONTEXT.md D-13/D-14).
 
     Lives on the Diagnostics device. Press action invokes the HA service
@@ -56,8 +56,8 @@ class TraefikReloadButton(TraefikEntity, ButtonEntity):
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: TraefikConfigEntry,
-        coordinator: TraefikCoordinator,
+        entry: TraefikProxyConfigEntry,
+        coordinator: TraefikProxyCoordinator,
     ) -> None:
         super().__init__(entry, category="diagnostics", description_key="reload")
         self._hass = hass
